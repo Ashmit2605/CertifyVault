@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:nodemon": "nodemon --exec tsx src/index.ts --ext ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
@@ -28,6 +29,7 @@
     "@types/node": "^26.2.0",
     "@types/pg": "^8.10.4",
     "drizzle-kit": "^0.31.10",
+    "nodemon": "^3.1.14",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }
