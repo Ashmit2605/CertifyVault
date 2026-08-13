@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 @import "tailwindcss";
 
 @theme {
@@ -18,3 +19,38 @@ body {
   overflow-y: scroll;
   font-family: var(--font-figtree);
 }
+=======
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+:root {
+  font-family: "Figtree", "Segoe UI", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #111827;
+  background-color: #f8fafc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Figtree", "Segoe UI", sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background: #f8fafc;
+  font-family: "Figtree", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: "Figtree", "Segoe UI", sans-serif;
+}
+>>>>>>> d9232f0c95872dc01e0ffa7aef3807efefa03fc5
