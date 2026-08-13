@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
 
 :root {
   font-family: 'Figtree', sans-serif;
@@ -8,15 +10,28 @@
   color-scheme: light;
 }
 
-
-
 #root {
   width: 100%;
   height: 100vh;
   overflow: hidden;
 }
 
-html, body {
+
+@theme {
+  --color-navy: #000F3E;
+  --color-brand: #0050F5;
+  --color-brand-light: #EAF1FF;
+
+  --font-figtree: "Figtree", sans-serif;
+}
+
+html {
+  scrollbar-gutter: stable;
+
+}
+
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -25,13 +40,46 @@ html, body {
   color: #000F3E;
 }
 
-h1, h2 {
+h1,
+h2 {
   font-family: 'Figtree', sans-serif;
   font-weight: 800;
   color: #000F3E;
   margin: 0;
+  min-height: 100vh;
+  overflow-y: scroll;
+  font-family: var(--font-figtree);
 }
 
-p {
+:root {
+  font-family: "Figtree", "Segoe UI", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #111827;
+  background-color: #f8fafc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+p,
+html,
+body,
+#root {
   margin: 0;
+  min-height: 100%;
+  font-family: "Figtree", "Segoe UI", sans-serif;
+}
+
+
+body {
+  min-height: 100vh;
+  background: #f8fafc;
+  font-family: "Figtree", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: "Figtree", "Segoe UI", sans-serif;
 }
