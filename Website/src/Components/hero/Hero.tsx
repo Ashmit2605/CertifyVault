@@ -28,16 +28,16 @@ export default function Hero() {
       />
       {/* Radial glow */}
       <div
-        className="absolute top-0 right-0 w-[600px] h-[600px] pointer-events-none"
+        className="absolute top-0 right-0 w-150 h-150 pointer-events-none"
         style={{
           background: 'radial-gradient(circle at 70% 30%, rgba(0,80,245,0.07) 0%, transparent 70%)',
         }}
       />
 
-      <div className="relative max-w-6xl mx-auto px-6 w-full">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 w-full">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Left: copy */}
-          <div>
+          <div className="text-center lg:text-left">
             <motion.div {...fadeUp(0.1)}>
               <span
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold tracking-widest mb-6"
@@ -58,14 +58,14 @@ export default function Hero() {
             </motion.h1>
 
             <motion.p
-              className="text-lg leading-relaxed mb-8 max-w-lg"
+              className="text-lg leading-relaxed mb-8 max-w-lg mx-auto lg:mx-0"
               style={{ color: 'var(--navy)', opacity: 0.6 }}
               {...fadeUp(0.3)}
             >
               CertifyVault lets institutions securely issue, store, and verify academic credentials — while detecting fraudulent or manipulated certificates with AI-powered analysis.
             </motion.p>
 
-            <motion.div className="flex flex-wrap gap-3 mb-8" {...fadeUp(0.4)}>
+            <motion.div className="flex flex-wrap justify-center lg:justify-start gap-3 mb-8" {...fadeUp(0.4)}>
               <Link
                 to="/app/register"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold text-white transition-all duration-200 no-underline"
@@ -109,7 +109,7 @@ export default function Hero() {
 
           {/* Right: certificate visual */}
           <motion.div
-            className="flex justify-center lg:justify-end"
+            className="hidden sm:flex justify-center lg:justify-end"
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}

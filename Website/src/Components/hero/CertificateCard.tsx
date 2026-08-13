@@ -2,18 +2,18 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, Blocks, QrCode, BadgeCheck, FileCheck } from 'lucide-react'
 
 const badges = [
-  { icon: QrCode,      label: 'QR Verified',        color: '#16A34A',       x: '-50%', y: '8%'  },
-  { icon: Blocks,      label: 'Blockchain Anchored', color: 'var(--blue)',   x: '108%',  y: '8%'  },
-  { icon: ShieldCheck, label: 'SHA-256 Matched',     color: 'var(--blue-2)', x: '-50%', y: '62%' },
-  { icon: BadgeCheck,  label: 'Issuer Verified',     color: '#16A34A',       x: '105%',  y: '62%' },
-  { icon: FileCheck,   label: 'Document Protected',  color: 'var(--navy)',   x: '8%',    y: '-16%'},
+  { icon: QrCode,      label: 'QR Verified',        color: '#16A34A',       x: '-40%', y: '8%'  },
+  { icon: Blocks,      label: 'Blockchain Anchored', color: 'var(--blue)',   x: '100%',  y: '8%'  },
+  { icon: ShieldCheck, label: 'SHA-256 Matched',     color: 'var(--blue-2)', x: '-40%', y: '62%' },
+  { icon: BadgeCheck,  label: 'Issuer Verified',     color: '#16A34A',       x: '100%',  y: '62%' },
+  { icon: FileCheck,   label: 'Document Protected',  color: 'var(--navy)',   x: '8%',    y: '-12%'},
 ]
 
 export default function CertificateCard() {
   return (
     <div
       className="relative flex items-center justify-center"
-      style={{ width: '420px', height: '500px' }}
+      style={{ width: 'min(420px, 90vw)', height: 'min(500px, 110vw)' }}
     >
       {/* Floating badges */}
       {badges.map((badge, i) => (

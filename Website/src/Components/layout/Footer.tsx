@@ -11,9 +11,9 @@ const footerLinks = {
   ],
   Security: [
     { label: 'Security', href: '/security' },
-    { label: 'Privacy', href: '/privacy' },
-    { label: 'Blockchain', href: '/security#blockchain' },
-    { label: 'Fraud Detection', href: '/security#fraud' },
+    { label: 'Privacy', href: '/product-privacy' },
+    { label: 'Blockchain', href: '/blockchain' },
+    { label: 'Fraud Detection', href: '/fraud-detection' },
   ],
   Company: [
     { label: 'About', href: '/about' },

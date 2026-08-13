@@ -11,7 +11,13 @@ import About from './Pages/About'
 import Contact from './Pages/Contact'
 import LoginPage from './Pages/Login'
 import SignupPage from './Pages/Signup'
-
+import ForgotPasswordPage from './Pages/ForgotPassword'
+import FraudDetection from './Pages/FraudDetection'
+import PrivacyPolicyPage from './Pages/PrivacyPolicyPage'
+import BlockchainPage from './Pages/Blockchain'
+import Documentation from './Pages/Documentation'
+import Privacy from './Pages/Privacy'
+ 
 // Verifier dashboard
 import VerifierDashLayout from './Pages/VerifierDashLayout/VerifierDashLayout'
 import VerifierDashboard from './Pages/VerifierDashLayout/VerifierDashboard'
@@ -36,8 +42,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* ── Auth pages (no navbar/footer) ── */}
-        <Route path="/app/login"    element={<LoginPage />} />
-        <Route path="/app/register" element={<SignupPage />} />
+        <Route path="/app/login"            element={<LoginPage />} />
+        <Route path="/app/register"         element={<SignupPage />} />
+        <Route path="/app/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* ── Verifier dashboard ── */}
         <Route path="/app/verifier" element={<VerifierDashLayout />}>
@@ -56,16 +63,21 @@ export default function App() {
 
         {/* ── Public marketing pages ── */}
         <Route element={<Layout />}>
-          <Route path="/"              element={<Home />} />
-          <Route path="/how-it-works"  element={<HowItWorks />} />
-          <Route path="/for-issuers"   element={<Issuers />} />
-          <Route path="/for-holders"   element={<Holders />} />
-          <Route path="/for-verifiers" element={<Verifiers />} />
-          <Route path="/security"      element={<Security />} />
-          <Route path="/verify"        element={<Verify />} />
-          <Route path="/about"         element={<About />} />
-          <Route path="/contact"       element={<Contact />} />
-          <Route path="*"              element={<ComingSoon label="Page Not Found" />} />
+          <Route path="/"                element={<Home />} />
+          <Route path="/how-it-works"    element={<HowItWorks />} />
+          <Route path="/for-issuers"     element={<Issuers />} />
+          <Route path="/for-holders"     element={<Holders />} />
+          <Route path="/for-verifiers"   element={<Verifiers />} />
+          <Route path="/security"        element={<Security />} />
+          <Route path="/verify"          element={<Verify />} />
+          <Route path="/about"           element={<About />} />
+          <Route path="/contact"         element={<Contact />} />
+          <Route path="/fraud-detection" element={<FraudDetection />} />
+          <Route path="/privacy"         element={<PrivacyPolicyPage />} />
+          <Route path="/blockchain"      element={<BlockchainPage/>} />
+          <Route path="/docs"            element={<Documentation />} />
+          <Route path="/product-privacy" element={<Privacy />} />
+          <Route path="*"                element={<ComingSoon label="Page Not Found" />} />
         </Route>
       </Routes>
     </BrowserRouter>
