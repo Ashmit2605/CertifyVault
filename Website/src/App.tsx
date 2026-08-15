@@ -26,6 +26,7 @@ import SavedVerifications from "./Pages/VerifierDashLayout/SavedVerifications";
 import VerificationReports from "./Pages/VerifierDashLayout/VerificationReports";
 
 
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // ==================== ISSUER DASHBOARD ====================
 import IssuerDashLayout from "./Pages/IssuerDashLayout/IssuerDashLayout";
 
