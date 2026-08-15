@@ -26,7 +26,7 @@ export default function VerifierNavbar() {
   useEffect(() => setMobileOpen(false), [location.pathname])
 
   const isActive = (href: string) =>
-    href === '/verifierdashboard'
+    href === '/verifierdashboard'   
       ? location.pathname === '/verifierdashboard'
       : location.pathname.startsWith(href)
 
