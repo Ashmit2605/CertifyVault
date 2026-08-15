@@ -1,4 +1,3 @@
-import { Routes, Route } from "react-router-dom";
 import Layout from "./Components/layout/Layout";
 import Home from "./Pages/Home";
 import HowItWorks from "./Pages/HowItWorks";
@@ -26,7 +25,7 @@ import SavedVerifications from "./Pages/VerifierDashLayout/SavedVerifications";
 import VerificationReports from "./Pages/VerifierDashLayout/VerificationReports";
 
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {  Routes, Route} from "react-router-dom";
 // ==================== ISSUER DASHBOARD ====================
 import IssuerDashLayout from "./Pages/IssuerDashLayout/IssuerDashLayout";
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutGrid,
   Landmark,
@@ -12,10 +12,12 @@ import {
   Settings,
   Search,
   Bell,
-  Plus,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import logo2 from "../../assets/Logo3.png";
 
 /**
  * Design tokens — Vault / Platform Admin
@@ -25,38 +27,90 @@ import {
  * Light Blue #F0F2F8 — subtle main-content wash
  * Font: Figtree
  */
+
 const COLORS = {
   navy: "#000F3E",
   blue: "#0050F5",
   blueSoft: "#3E77FF",
   white: "#FFFFFF",
   lightBlue: "#F0F2F8",
-  mainBg: "#F7F8FC", // subtle wash for the content area, distinct from the white sidebar
+  mainBg: "#F7F8FC",
   line: "#E2E6F0",
   textDim: "#6B7BA6",
   green: "#18B37D",
   amber: "#F5A623",
   red: "#F5484B",
+  redSoft: "#FDECEC",
 };
 
 interface NavItem {
   key: string;
   label: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-  badge?: number;
+  path: string;
 }
 
+// Each item's `path` drives navigation via react-router, same pattern as Admindash.jsx
 const NAV_ITEMS: NavItem[] = [
-  { key: "overview", label: "Overview", icon: LayoutGrid },
-  { key: "institutions", label: "Institutions", icon: Landmark, badge: 128 },
-  { key: "users", label: "Users", icon: Users },
-  { key: "issuers", label: "Issuers", icon: FileStack },
-  { key: "verification", label: "Verification Activity", icon: ShieldCheck, badge: 14 },
-  { key: "fraud", label: "Fraud & Security", icon: ShieldAlert, badge: 3 },
-  { key: "blockchain", label: "Blockchain", icon: Boxes },
-  { key: "health", label: "System Health", icon: Activity },
-  { key: "audit", label: "Audit Logs", icon: ScrollText },
-  { key: "settings", label: "Settings", icon: Settings },
+  { key: "overview", 
+    label: "Overview", 
+    icon: LayoutGrid, 
+    path: "/admindashboard" 
+  },
+
+  { key: "institutions", 
+    label: "Institutions", 
+    icon: Landmark, 
+    path: "/admindashboard/institutions" 
+  },
+
+  { key: "users", 
+    label: "Users", 
+    icon: Users, 
+    path: "/admindashboard/users" 
+  },
+
+  { key: "issuers", 
+    label: "Issuers", 
+    icon: FileStack, 
+    path: "/admindashboard/issuers" 
+  },
+
+  { key: "verification", 
+    label: "Verification Activity", 
+    icon: ShieldCheck, 
+    path: "/admindashboard/verification" 
+  },
+
+  { key: "fraud", 
+    label: "Fraud & Security", 
+    icon: ShieldAlert, 
+    path: "/admindashboard/fraud" 
+  },
+
+  { key: "blockchain", 
+    label: "Blockchain", 
+    icon: Boxes, 
+    path: "/admindashboard/blockchain" 
+  },
+
+  { key: "health", 
+    label: "System Health", 
+    icon: Activity, 
+    path: "/admindashboard/health" 
+  },
+
+  { key: "audit", 
+    label: "Audit Logs", 
+    icon: ScrollText, 
+    path: "/admindashboard/audit" 
+  },
+  
+  { key: "settings", 
+    label: "Settings", 
+    icon: Settings, 
+    path: "/dashboard/admin/settings" 
+  },
 ];
 
 /* ---------------------------------------------------------------- */
@@ -82,21 +136,216 @@ function useViewport() {
 }
 
 /* ---------------------------------------------------------------- */
+/*  Fit-to-height sizing for the icon rail — shrinks buttons/gaps    */
+/*  so all items always fit with no scrolling, no overlap.           */
+/*                                                                    */
+/*  NOTE: this hook measures the *nav* container's own clientHeight, */
+/*  which is a CSS-pixel measurement. Browser zoom (90% / 100% /     */
+/*  110%) scales layout viewport + element sizes together, so the    */
+/*  ratio between "space needed" and "space available" is preserved */
+/*  and the computed fit stays stable across zoom levels — it only   */
+/*  shrinks when there genuinely isn't enough vertical room (e.g. a  */
+/*  very short window), never as a side-effect of zooming.           */
+/* ---------------------------------------------------------------- */
+
+interface RailFit {
+  size: number;
+  gap: number;
+  icon: number;
+}
+
+function useFitRail(count: number) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [fit, setFit] = useState<RailFit>({ size: 52, gap: 10, icon: 19 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || count <= 0) return;
+
+    const MAX_SIZE = 52;
+    const MAX_GAP = 10;
+    const MIN_SIZE = 30;
+    const MIN_GAP = 3;
+
+    const compute = () => {
+      const available = el.clientHeight;
+      const neededAtMax = count * MAX_SIZE + (count - 1) * MAX_GAP;
+
+      if (available <= 0) return;
+
+      if (neededAtMax <= available || count <= 1) {
+        setFit({ size: MAX_SIZE, gap: MAX_GAP, icon: 19 });
+        return;
+      }
+
+      const sizeRange = MAX_SIZE - MIN_SIZE;
+      const gapRange = MAX_GAP - MIN_GAP;
+      const denom = count * sizeRange + (count - 1) * gapRange;
+      const neededAtMin = count * MIN_SIZE + (count - 1) * MIN_GAP;
+      let t = denom > 0 ? (available - neededAtMin) / denom : 0;
+      t = Math.max(0, Math.min(1, t));
+
+      const size = MIN_SIZE + t * sizeRange;
+      const gap = MIN_GAP + t * gapRange;
+      const icon = Math.max(14, Math.round(size * 0.36));
+
+      setFit({ size, gap, icon });
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    window.addEventListener("resize", compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, [count]);
+
+  return { containerRef, ...fit };
+}
+
+/* ---------------------------------------------------------------- */
+/*  Logout confirmation modal                                        */
+/* ---------------------------------------------------------------- */
+
+interface LogoutConfirmModalProps {
+  isOpen: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function LogoutConfirmModal({ isOpen, onCancel, onConfirm }: LogoutConfirmModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0, 15, 62, 0.45)",
+        zIndex: 2000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        animation: "fadeIn 0.15s ease-out",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logout-modal-title"
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          background: COLORS.white,
+          borderRadius: 18,
+          boxShadow: "0 24px 60px rgba(0,15,62,0.28)",
+          padding: 24,
+          fontFamily: "Figtree, sans-serif",
+          animation: "scaleIn 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        <h2
+          id="logout-modal-title"
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            color: COLORS.navy,
+            margin: 0,
+            marginBottom: 6,
+          }}
+        >
+          Log out of CertifyVault?
+        </h2>
+        <p
+          style={{
+            fontSize: 13.5,
+            color: COLORS.textDim,
+            fontWeight: 500,
+            margin: 0,
+            marginBottom: 22,
+            lineHeight: 1.5,
+          }}
+        >
+          You'll need to sign back in to access the admin dashboard again.
+        </p>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 16px",
+              borderRadius: 12,
+              border: `1px solid ${COLORS.line}`,
+              background: COLORS.white,
+              color: COLORS.navy,
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "background 0.15s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.lightBlue)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = COLORS.white)}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1,
+              padding: "11px 16px",
+              borderRadius: 12,
+              border: "none",
+              background: COLORS.red,
+              color: COLORS.white,
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "background 0.15s ease",
+              boxShadow: "0 10px 22px rgba(245,72,75,0.28)",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#D93E41")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = COLORS.red)}
+          >
+            Log out
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.94) translateY(6px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
 /*  Mobile Drawer — hamburger menu sidebar for mobile               */
 /* ---------------------------------------------------------------- */
 
-function MobileDrawer({
-  active,
-  setActive,
-  isOpen,
-  setIsOpen,
-}: {
-  active: string;
-  setActive: (k: string) => void;
+interface MobileDrawerProps {
+  activeKey: string;
+  onNavigate: (item: NavItem) => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-}) {
-  
+  onLogoutClick: () => void;
+}
+
+function MobileDrawer({ activeKey, onNavigate, isOpen, setIsOpen, onLogoutClick }: MobileDrawerProps) {
   return (
     <>
       {/* Backdrop */}
@@ -204,12 +453,12 @@ function MobileDrawer({
         >
           {NAV_ITEMS.map((item) => {
             const ItemIcon = item.icon;
-            const isActive = active === item.key;
+            const isActive = activeKey === item.key;
             return (
               <button
                 key={item.key}
                 onClick={() => {
-                  setActive(item.key);
+                  onNavigate(item);
                   setIsOpen(false);
                 }}
                 style={{
@@ -239,52 +488,47 @@ function MobileDrawer({
               >
                 <ItemIcon size={18} strokeWidth={1.8} />
                 <span style={{ flex: 1 }}>{item.label}</span>
-                {typeof item.badge === "number" && item.badge > 0 && (
-                  <span
-                    style={{
-                      minWidth: 20,
-                      height: 20,
-                      padding: "0 6px",
-                      borderRadius: 10,
-                      background: item.key === "fraud" ? COLORS.red : COLORS.blue,
-                      color: COLORS.white,
-                      fontSize: 10,
-                      fontWeight: 800,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.badge > 99 ? "99+" : item.badge}
-                  </span>
-                )}
               </button>
             );
           })}
         </nav>
 
-        {/* Drawer Footer */}
+        {/* Logout — pinned to the bottom of the drawer */}
         <div
           style={{
-            padding: "16px 20px",
-            borderTop: `1px solid ${COLORS.line}`,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
             flexShrink: 0,
+            padding: "12px",
+            borderTop: `1px solid ${COLORS.line}`,
           }}
         >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: COLORS.green,
-              boxShadow: `0 0 0 4px rgba(24,179,125,0.16)`,
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              onLogoutClick();
             }}
-          />
-          <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textDim }}>Ledger synced</span>
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "13px 16px",
+              borderRadius: 12,
+              border: "none",
+              background: "transparent",
+              color: COLORS.red,
+              cursor: "pointer",
+              fontFamily: "Figtree, sans-serif",
+              fontSize: 14.5,
+              fontWeight: 700,
+              textAlign: "left",
+              transition: "background 0.15s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.redSoft)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <LogOut size={18} strokeWidth={1.8} />
+            <span style={{ flex: 1 }}>Log out</span>
+          </button>
         </div>
       </div>
 
@@ -302,21 +546,31 @@ function MobileDrawer({
 /*  Desktop Sidebar — light-theme circular icon rail                 */
 /* ---------------------------------------------------------------- */
 
-function RailButton({
-  item,
-  active,
-  onClick,
-}: {
+interface RailButtonProps {
   item: NavItem;
   active: boolean;
   onClick: () => void;
-}) {
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  size: number;
+  iconSize: number;
+}
+
+interface TooltipPos {
+  x: number;
+  y: number;
+}
+
+function RailButton({ item, active, onClick, size, iconSize }: RailButtonProps) {
+  const [tooltipPos, setTooltipPos] = useState<TooltipPos | null>(null);
   const Icon = item.icon;
 
   return (
     <div
-      style={{ position: "relative", display: "flex", justifyContent: "center" }}
+      style={{
+        position: "relative",
+        display: "flex",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
       onMouseEnter={(e) => {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
         setTooltipPos({ x: r.right + 12, y: r.top + r.height / 2 });
@@ -328,8 +582,8 @@ function RailButton({
         aria-label={item.label}
         aria-current={active ? "page" : undefined}
         style={{
-          width: 52,
-          height: 52,
+          width: size,
+          height: size,
           borderRadius: "50%",
           border: "none",
           cursor: "pointer",
@@ -338,39 +592,13 @@ function RailButton({
           justifyContent: "center",
           background: active ? COLORS.blue : COLORS.white,
           color: active ? COLORS.white : COLORS.navy,
-          boxShadow: active
-            ? `0 10px 22px rgba(0,80,245,0.35)`
-            : "0 2px 6px rgba(0,15,62,0.07)",
-          transition: "background .15s ease, transform .1s ease, box-shadow .15s ease",
+          boxShadow: "0 2px 6px rgba(0,15,62,0.07)",
+          transition: "background .15s ease, transform .1s ease, box-shadow .15s ease, width .15s ease, height .15s ease",
           position: "relative",
           flexShrink: 0,
         }}
       >
-        <Icon size={19} strokeWidth={1.8} />
-        {typeof item.badge === "number" && item.badge > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: -2,
-              right: -2,
-              minWidth: 16,
-              height: 16,
-              padding: "0 4px",
-              borderRadius: 999,
-              background: item.key === "fraud" ? COLORS.red : COLORS.blue,
-              color: COLORS.white,
-              fontSize: 9,
-              fontWeight: 800,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: `2px solid ${COLORS.lightBlue}`,
-              boxSizing: "border-box",
-            }}
-          >
-            {item.badge > 99 ? "99+" : item.badge}
-          </span>
-        )}
+        <Icon size={iconSize} strokeWidth={1.8} />
       </button>
 
       {/* tooltip — fixed so it escapes sidebar's overflow:hidden */}
@@ -395,22 +623,107 @@ function RailButton({
           }}
         >
           {item.label}
-          {typeof item.badge === "number" && item.badge > 0 && (
-            <span style={{ opacity: 0.6, marginLeft: 6 }}>· {item.badge}</span>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-function Sidebar({
-  active,
-  setActive,
-}: {
-  active: string;
-  setActive: (k: string) => void;
-}) {
+/* Logout rail button — visually distinct (red) but sized to match the
+   nav rail's current fit so it never causes the rail above it to
+   look mismatched. It sits OUTSIDE the useFitRail-measured container,
+   so it has a fixed footprint and is never itself a candidate for
+   shrinking — it simply reserves its own space at the bottom of the
+   sidebar, which the fit calculation above it already accounts for
+   automatically (nav container is flex:1, so it only ever gets the
+   height that's left over once brand + divider + logout are laid out). */
+interface LogoutRailButtonProps {
+  onClick: () => void;
+  size: number;
+  iconSize: number;
+}
+
+function LogoutRailButton({ onClick, size, iconSize }: LogoutRailButtonProps) {
+  const [tooltipPos, setTooltipPos] = useState<TooltipPos | null>(null);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setTooltipPos({ x: r.right + 12, y: r.top + r.height / 2 });
+      }}
+      onMouseLeave={() => setTooltipPos(null)}
+    >
+      <button
+        onClick={onClick}
+        aria-label="Log out"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          border: "none",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: COLORS.white,
+          color: COLORS.red,
+          boxShadow: "0 2px 6px rgba(0,15,62,0.07)",
+          transition: "background .15s ease, color .15s ease",
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = COLORS.redSoft;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = COLORS.white;
+        }}
+      >
+        <LogOut size={iconSize} strokeWidth={1.8} />
+      </button>
+
+      {tooltipPos && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: "translateY(-50%)",
+            background: COLORS.navy,
+            color: COLORS.white,
+            fontFamily: "Figtree, sans-serif",
+            fontSize: 12.5,
+            fontWeight: 600,
+            padding: "7px 12px",
+            borderRadius: 9,
+            whiteSpace: "nowrap",
+            boxShadow: "0 10px 24px rgba(0,15,62,0.28)",
+            zIndex: 9999,
+            pointerEvents: "none",
+          }}
+        >
+          Log out
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SidebarProps {
+  activeKey: string;
+  onNavigate: (item: NavItem) => void;
+  onLogoutClick: () => void;
+}
+
+function Sidebar({ activeKey, onNavigate, onLogoutClick }: SidebarProps) {
+  const { containerRef, size, gap, icon } = useFitRail(NAV_ITEMS.length);
+
   return (
     <aside
       style={{
@@ -422,9 +735,10 @@ function Sidebar({
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "26px 0",
+        padding: "26px 0 20px",
         borderRight: `1px solid ${COLORS.line}`,
         gap: 0,
+        boxSizing: "border-box",
       }}
     >
       {/* brand mark */}
@@ -432,41 +746,43 @@ function Sidebar({
         style={{
           width: 44,
           height: 44,
-          borderRadius: "50%",
-          background: COLORS.navy,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 8px 18px rgba(0,15,62,0.25)",
           flexShrink: 0,
           marginBottom: 20,
+          overflow: "hidden",
         }}
       >
-        <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-          <path
-            d="M12 2L4 5.5V11c0 5.2 3.4 9.7 8 11 4.6-1.3 8-5.8 8-11V5.5L12 2Z"
-            fill={COLORS.white}
-          />
-          <path
-            d="M8.5 12.2l2.4 2.4 4.6-4.9"
-            stroke={COLORS.blue}
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <img
+          src={logo2}
+          alt="Logo"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+          }}
+        />
       </div>
 
       {/* divider */}
-      <div style={{ width: 28, height: 1, background: COLORS.line, marginBottom: 8 }} />
+      <div style={{ width: 28, height: 1, background: COLORS.line, marginBottom: 8, flexShrink: 0 }} />
 
-      {/* nav rail */}
+      {/* nav rail — sized to always fit the remaining height, no scrolling.
+          This container is flex:1 / minHeight:0, so it only ever receives
+          the space left over after the brand mark and the logout button
+          below have taken theirs — that's what keeps the whole sidebar
+          scroll-free and stable across browser zoom levels. */}
       <nav
+        ref={containerRef}
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          gap,
           flex: 1,
+          minHeight: 0,
+          width: "100%",
+          alignItems: "center",
           justifyContent: "center",
           overflow: "hidden",
         }}
@@ -475,90 +791,22 @@ function Sidebar({
           <RailButton
             key={item.key}
             item={item}
-            active={active === item.key}
-            onClick={() => setActive(item.key)}
+            active={activeKey === item.key}
+            onClick={() => onNavigate(item)}
+            size={size}
+            iconSize={icon}
           />
         ))}
       </nav>
 
-      {/* footer: status */}
-      <div
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: COLORS.green,
-          boxShadow: `0 0 0 4px rgba(24,179,125,0.16)`,
-          marginTop: 16,
-          marginBottom: 12,
-        }}
-        title="Ledger synced"
-      />
-    </aside>
-  );
-}
+      {/* divider above logout */}
+      <div style={{ width: 28, height: 1, background: COLORS.line, margin: "8px 0", flexShrink: 0 }} />
 
-/* ---------------------------------------------------------------- */
-/*  Small building blocks for the main content                       */
-/* ---------------------------------------------------------------- */
-
-function StatCard({
-  icon: Icon,
-  iconBg,
-  iconColor,
-  trend,
-  trendUp,
-  value,
-  label,
-}: {
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-  iconBg: string;
-  iconColor: string;
-  trend: string;
-  trendUp: boolean;
-  value: string;
-  label: string;
-}) {
-  return (
-    <div
-      style={{
-        background: COLORS.white,
-        borderRadius: 18,
-        border: `1px solid ${COLORS.line}`,
-        padding: 20,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 11,
-            background: iconBg,
-            color: iconColor,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon size={18} strokeWidth={1.8} />
-        </div>
-        <span
-          style={{
-            fontSize: 11.5,
-            fontWeight: 700,
-            padding: "3px 8px",
-            borderRadius: 20,
-            color: trendUp ? COLORS.green : COLORS.red,
-            background: trendUp ? "rgba(24,179,125,0.12)" : "rgba(245,72,75,0.1)",
-          }}
-        >
-          {trend}
-        </span>
+      {/* logout — pinned to the bottom-left of the sidebar, fixed footprint */}
+      <div style={{ flexShrink: 0 }}>
+        <LogoutRailButton onClick={onLogoutClick} size={size} iconSize={icon} />
       </div>
-      <div style={{ fontSize: 25, fontWeight: 800, color: COLORS.navy, letterSpacing: -0.4 }}>{value}</div>
-      <div style={{ fontSize: 12.5, color: COLORS.textDim, fontWeight: 600, marginTop: 4 }}>{label}</div>
-    </div>
+    </aside>
   );
 }
 
@@ -566,11 +814,32 @@ function StatCard({
 /*  App                                                               */
 /* ---------------------------------------------------------------- */
 
-export default function PlatformAdminDashboard() {
-  const [active, setActive] = useState("overview");
+export default function AdminDashLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { isMobile, isTablet } = useViewport();
-  const activeLabel = NAV_ITEMS.find((n) => n.key === active)?.label ?? "Overview";
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const { isMobile } = useViewport();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Active nav item is derived from the current route, same idea as
+  // Admindash.jsx's handleNavigation/activeTab pairing.
+  const activeItem: NavItem =
+    NAV_ITEMS.find((item) => location.pathname === item.path) ||
+    NAV_ITEMS.find((item) => location.pathname.startsWith(item.path) && item.path !== "/admindashboard") ||
+    NAV_ITEMS[0];
+  const activeKey = activeItem.key;
+  const activeLabel = activeItem.label;
+
+  const handleNavigate = (item: NavItem) => {
+    navigate(item.path);
+  };
+
+  const handleLogoutConfirm = () => {
+    // Wire this up to your actual auth/session teardown
+    // (e.g. clearing an auth context, invalidating a session token, etc.)
+    setShowLogoutConfirm(false);
+    navigate("/login");
+  };
 
   return (
     <div
@@ -587,10 +856,31 @@ export default function PlatformAdminDashboard() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap');`}</style>
 
       {/* Desktop Sidebar */}
-      {!isMobile && <Sidebar active={active} setActive={setActive} />}
+      {!isMobile && (
+        <Sidebar
+          activeKey={activeKey}
+          onNavigate={handleNavigate}
+          onLogoutClick={() => setShowLogoutConfirm(true)}
+        />
+      )}
 
       {/* Mobile Drawer */}
-      {isMobile && <MobileDrawer active={active} setActive={setActive} isOpen={drawerOpen} setIsOpen={setDrawerOpen} />}
+      {isMobile && (
+        <MobileDrawer
+          activeKey={activeKey}
+          onNavigate={handleNavigate}
+          isOpen={drawerOpen}
+          setIsOpen={setDrawerOpen}
+          onLogoutClick={() => setShowLogoutConfirm(true)}
+        />
+      )}
+
+      {/* Logout confirmation modal — shared by desktop rail + mobile drawer */}
+      <LogoutConfirmModal
+        isOpen={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogoutConfirm}
+      />
 
       <main
         style={{
@@ -721,125 +1011,11 @@ export default function PlatformAdminDashboard() {
                 }}
               />
             </button>
-
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                background: COLORS.blue,
-                color: COLORS.white,
-                border: "none",
-                borderRadius: 14,
-                padding: "11px 18px",
-                fontFamily: "inherit",
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: "0 10px 20px rgba(0,80,245,0.28)",
-                flex: isMobile ? 1 : "none",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <Plus size={16} />
-              New Institution
-            </button>
           </div>
         </div>
 
-        {/* stats */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile
-              ? "repeat(2, 1fr)"
-              : isTablet
-                ? "repeat(3, 1fr)"
-                : "repeat(5, 1fr)",
-            gap: isMobile ? 10 : 16,
-            marginBottom: isMobile ? 18 : 24,
-          }}
-        >
-          <StatCard icon={Landmark} iconBg="rgba(0,80,245,0.1)" iconColor={COLORS.blue} trend="+4.2%" trendUp value="128" label="Institutions" />
-          <StatCard icon={Users} iconBg="rgba(0,15,62,0.08)" iconColor={COLORS.navy} trend="+1.8%" trendUp value="42,918" label="Active Users" />
-          <StatCard icon={ShieldCheck} iconBg="rgba(24,179,125,0.12)" iconColor={COLORS.green} trend="+0.6%" trendUp value="99.2%" label="Verification Success" />
-          <StatCard icon={FileStack} iconBg="rgba(245,166,35,0.14)" iconColor={COLORS.amber} trend="+12" trendUp value="36" label="Issuers Onboarded" />
-          <StatCard icon={ShieldAlert} iconBg="rgba(245,72,75,0.12)" iconColor={COLORS.red} trend="-2" trendUp={false} value="3" label="Open Fraud Alerts" />
-        </div>
-
-        {/* content panels */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile || isTablet ? "1fr" : "1.6fr 1fr",
-            gap: 20,
-          }}
-        >
-          <div style={{ background: COLORS.white, borderRadius: 28, border: `1px solid ${COLORS.line}`, padding: isMobile ? 18 : 24 }}>
-            <h2 style={{ fontSize: 16.5, fontWeight: 800, margin: 0 }}>Verification Volume</h2>
-            <p style={{ fontSize: 12, color: COLORS.textDim, fontWeight: 500, marginTop: 2 }}>
-              Requests processed across the ledger, last 7 days
-            </p>
-
-            <div style={{ height: isMobile ? 160 : 200, display: "flex", alignItems: "flex-end", gap: isMobile ? 6 : 10, marginTop: 18 }}>
-              {[
-                { d: "Mon", h: 64, ghost: false },
-                { d: "Tue", h: 82, ghost: false },
-                { d: "Wed", h: 48, ghost: true },
-                { d: "Thu", h: 91, ghost: false },
-                { d: "Fri", h: 70, ghost: false },
-                { d: "Sat", h: 38, ghost: true },
-                { d: "Sun", h: 30, ghost: true },
-              ].map((b) => (
-                <div key={b.d} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                  <div
-                    style={{
-                      width: "100%",
-                      maxWidth: 34,
-                      height: `${b.h}%`,
-                      borderRadius: "8px 8px 4px 4px",
-                      background: b.ghost ? COLORS.lightBlue : `linear-gradient(180deg, ${COLORS.blueSoft}, ${COLORS.blue})`,
-                    }}
-                  />
-                  <span style={{ fontSize: 10.5, color: COLORS.textDim, fontWeight: 700 }}>{b.d}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ background: COLORS.white, borderRadius: 28, border: `1px solid ${COLORS.line}`, padding: isMobile ? 18 : 24 }}>
-            <h2 style={{ fontSize: 16.5, fontWeight: 800, margin: 0 }}>Recent Activity</h2>
-            <p style={{ fontSize: 12, color: COLORS.textDim, fontWeight: 500, marginTop: 2 }}>System &amp; audit log stream</p>
-
-            <div style={{ display: "flex", flexDirection: "column", marginTop: 12 }}>
-              {[
-                { title: "Identity verified — Solstice Finance", sub: "Issuer · automated check", time: "2m", color: COLORS.green },
-                { title: "Fraud alert raised — Harbor Vault Trust", sub: "Flagged by anomaly model", time: "18m", color: COLORS.red },
-                { title: "Block #2,481,930 confirmed", sub: "142 records anchored", time: "31m", color: COLORS.blue },
-                { title: "New admin invited", sub: "priya.desai@cedarunion.com", time: "1h", color: COLORS.amber },
-              ].map((a) => (
-                <div
-                  key={a.title}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "12px 4px",
-                    borderBottom: `1px solid ${COLORS.lightBlue}`,
-                  }}
-                >
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.navy }}>{a.title}</div>
-                    <div style={{ fontSize: 11.5, color: COLORS.textDim, fontWeight: 500, marginTop: 1 }}>{a.sub}</div>
-                  </div>
-                  <div style={{ fontSize: 11, color: COLORS.textDim, fontWeight: 600, whiteSpace: "nowrap" }}>{a.time}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Page content — each sidebar item's own page renders here via its route */}
+        <Outlet />
       </main>
     </div>
   );
