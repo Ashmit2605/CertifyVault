@@ -149,9 +149,9 @@ export default function App() {
         {/* ──────────────── DASHBOARDS (WITH /app PREFIX) ──────────────── */}
 
         {/* ── Verifier Dashboard ── */}
-        <Route path="/dashboard/verifier" element={<VerifierDashLayout />}>
+        <Route path="/verifierdashboard" element={<VerifierDashLayout />}>
           <Route index element={<VerifierDashboard />} />
-          <Route path="verify" element={<VerifierDashboard />} />
+          <Route path="verify" element={<Verify />} />
           <Route path="history" element={<VerificationHistory />} />
           <Route path="saved" element={<SavedVerifications />} />
           <Route path="reports" element={<VerificationReports />} />
@@ -159,7 +159,7 @@ export default function App() {
         </Route>
 
         {/* ── Holder Dashboard ── */}
-        <Route path="/dashboard/holder" element={<HolderDashboardLayout />}>
+        <Route path="/holderdashboard" element={<HolderDashboardLayout />}>
           <Route index element={<HolderHome />} />
           <Route path="certificates" element={<MyCertificates />} />
           <Route path="verification" element={<HolderVerification />} />
@@ -170,7 +170,7 @@ export default function App() {
 
         {/* ── Issuer Dashboard ── */}
         <Route
-          path="/dashboard/issuer"
+          path="/issuerdashboard"
           element={
             <TemplatesProvider>
               <IssuerDashLayout />

@@ -5,11 +5,11 @@ import { Search, Bell, ChevronDown, Menu, X, LayoutDashboard, ScanLine, History,
 import Logo from '../../assets/Logo.png'
 
 const navItems = [
-  { label: 'Dashboard', href: '/app/verifier',          icon: LayoutDashboard },
-  { label: 'Verify',    href: '/app/verifier/verify',   icon: ScanLine        },
-  { label: 'History',   href: '/app/verifier/history',  icon: History         },
-  { label: 'Saved',     href: '/app/verifier/saved',    icon: Bookmark        },
-  { label: 'Reports',   href: '/app/verifier/reports',  icon: FileText        },
+  { label: 'Dashboard', href: '/verifierdashboard',          icon: LayoutDashboard },
+  { label: 'Verify',    href: '/verifierdashboard/verify',   icon: ScanLine        },
+  { label: 'History',   href: '/verifierdashboard/history',  icon: History         },
+  { label: 'Saved',     href: '/verifierdashboard/saved',    icon: Bookmark        },
+  { label: 'Reports',   href: '/verifierdashboard/reports',  icon: FileText        },
 ]
 
 export default function VerifierNavbar() {
@@ -26,8 +26,8 @@ export default function VerifierNavbar() {
   useEffect(() => setMobileOpen(false), [location.pathname])
 
   const isActive = (href: string) =>
-    href === '/app/verifier'
-      ? location.pathname === '/app/verifier'
+    href === '/verifierdashboard'
+      ? location.pathname === '/verifierdashboard'
       : location.pathname.startsWith(href)
 
   return (
