@@ -52,64 +52,74 @@ interface NavItem {
 
 // Each item's `path` drives navigation via react-router, same pattern as Admindash.jsx
 const NAV_ITEMS: NavItem[] = [
-  { key: "overview", 
-    label: "Overview", 
-    icon: LayoutGrid, 
-    path: "/admindashboard" 
+  {
+    key: "overview",
+    label: "Overview",
+    icon: LayoutGrid,
+    path: "/dashboard/admin"
   },
 
-  { key: "institutions", 
-    label: "Institutions", 
-    icon: Landmark, 
-    path: "/admindashboard/institutions" 
+  {
+    key: "institutions",
+    label: "Institutions",
+    icon: Landmark,
+    path: "/dashboard/admin/institutions"
   },
 
-  { key: "users", 
-    label: "Users", 
-    icon: Users, 
-    path: "/admindashboard/users" 
+  {
+    key: "users",
+    label: "Users",
+    icon: Users,
+    path: "/dashboard/admin/users"
   },
 
-  { key: "issuers", 
-    label: "Issuers", 
-    icon: FileStack, 
-    path: "/admindashboard/issuers" 
+  {
+    key: "issuers",
+    label: "Issuers",
+    icon: FileStack,
+    path: "/dashboard/admin/issuers"
   },
 
-  { key: "verification", 
-    label: "Verification Activity", 
-    icon: ShieldCheck, 
-    path: "/admindashboard/verification" 
+  {
+    key: "verification",
+    label: "Verification Activity",
+    icon: ShieldCheck,
+    path: "/dashboard/admin/verification"
   },
 
-  { key: "fraud", 
-    label: "Fraud & Security", 
-    icon: ShieldAlert, 
-    path: "/admindashboard/fraud" 
+  {
+    key: "fraud",
+    label: "Fraud & Security",
+    icon: ShieldAlert,
+    path: "/dashboard/admin/fraud"
   },
 
-  { key: "blockchain", 
-    label: "Blockchain", 
-    icon: Boxes, 
-    path: "/admindashboard/blockchain" 
+  {
+    key: "blockchain",
+    label: "Blockchain",
+    icon: Boxes,
+    path: "/dashboard/admin/blockchain"
   },
 
-  { key: "health", 
-    label: "System Health", 
-    icon: Activity, 
-    path: "/admindashboard/health" 
+  {
+    key: "health",
+    label: "System Health",
+    icon: Activity,
+    path: "/dashboard/admin/health"
   },
 
-  { key: "audit", 
-    label: "Audit Logs", 
-    icon: ScrollText, 
-    path: "/admindashboard/audit" 
+  {
+    key: "audit",
+    label: "Audit Logs",
+    icon: ScrollText,
+    path: "/dashboard/admin/audit"
   },
-  
-  { key: "settings", 
-    label: "Settings", 
-    icon: Settings, 
-    path: "/dashboard/admin/settings" 
+
+  {
+    key: "settings",
+    label: "Settings",
+    icon: Settings,
+    path: "/dashboard/admin/settings"
   },
 ];
 
@@ -828,7 +838,6 @@ export default function AdminDashLayout() {
     NAV_ITEMS.find((item) => location.pathname.startsWith(item.path) && item.path !== "/admindashboard") ||
     NAV_ITEMS[0];
   const activeKey = activeItem.key;
-  const activeLabel = activeItem.label;
 
   const handleNavigate = (item: NavItem) => {
     navigate(item.path);
@@ -886,7 +895,7 @@ export default function AdminDashLayout() {
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: isMobile ? "20px 16px 20px" : "30px 40px 50px",
+          padding: isMobile ? "8px 16px 20px" : "16px 40px 50px",
           background: COLORS.mainBg,
           position: "relative",
         }}
@@ -898,20 +907,11 @@ export default function AdminDashLayout() {
             flexDirection: isMobile ? "column" : "row",
             alignItems: isMobile ? "stretch" : "center",
             justifyContent: "space-between",
-            marginBottom: isMobile ? 20 : 28,
+            marginBottom: 0,
             gap: isMobile ? 16 : 24,
             position: "relative",
           }}
         >
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: isMobile ? 21 : 26, fontWeight: 800, letterSpacing: -0.3, margin: 0 }}>
-              {activeLabel}
-            </h1>
-            <p style={{ fontSize: 13.5, color: COLORS.textDim, fontWeight: 500, marginTop: 4 }}>
-              Platform-wide activity across institutions, issuers &amp; the verification ledger
-            </p>
-          </div>
-
           {/* Mobile Hamburger Button */}
           {isMobile && (
             <button
@@ -944,74 +944,6 @@ export default function AdminDashLayout() {
               <Menu size={20} />
             </button>
           )}
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: isMobile ? "wrap" : "nowrap",
-              width: isMobile ? "100%" : "auto",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: COLORS.white,
-                border: `1px solid ${COLORS.line}`,
-                borderRadius: 14,
-                padding: "10px 16px",
-                width: isMobile ? "100%" : 260,
-                boxSizing: "border-box",
-              }}
-            >
-              <Search size={16} color={COLORS.textDim} />
-              <input
-                placeholder="Search institutions, users, logs…"
-                style={{
-                  border: "none",
-                  outline: "none",
-                  fontFamily: "inherit",
-                  fontSize: 13.5,
-                  color: COLORS.navy,
-                  background: "transparent",
-                  width: "100%",
-                }}
-              />
-            </div>
-
-            <button
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 14,
-                background: COLORS.white,
-                border: `1px solid ${COLORS.line}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                position: "relative",
-                flexShrink: 0,
-              }}
-            >
-              <Bell size={18} color={COLORS.navy} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 9,
-                  right: 9,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: COLORS.red,
-                  border: `2px solid ${COLORS.white}`,
-                }}
-              />
-            </button>
-          </div>
         </div>
 
         {/* Page content — each sidebar item's own page renders here via its route */}
