@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -8,20 +8,6 @@
 
   --font-figtree: "Figtree", sans-serif;
 }
-
-html {
-  scrollbar-gutter: stable;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  overflow-y: scroll;
-  font-family: var(--font-figtree);
-}
-=======
-@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap");
-@import "tailwindcss";
 
 :root {
   font-family: "Figtree", "Segoe UI", sans-serif;
@@ -35,6 +21,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 html,
 body,
 #root {
@@ -44,13 +34,14 @@ body,
 }
 
 body {
+  margin: 0;
   min-height: 100vh;
+  overflow-y: scroll;
   background: #f8fafc;
-  font-family: "Figtree", "Segoe UI", sans-serif;
+  font-family: var(--font-figtree);
 }
 
 * {
   box-sizing: border-box;
   font-family: "Figtree", "Segoe UI", sans-serif;
 }
->>>>>>> d9232f0c95872dc01e0ffa7aef3807efefa03fc5
