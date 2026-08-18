@@ -99,11 +99,6 @@ export default function ContactPage() {
             </motion.div>
           )}
         </motion.div>
-
-        <div className="mt-8 flex justify-center gap-2 items-center">
-          <Mail size={14} style={{ color: 'var(--navy)', opacity: 0.4 }} />
-          <span className="text-sm" style={{ color: 'var(--navy)', opacity: 0.4 }}>hello@certifyvault.in</span>
-        </div>
       </div>
     </div>
   )
