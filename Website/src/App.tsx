@@ -247,7 +247,7 @@ export default function App() {
         </Route>
 
         {/* ── Admin Dashboard ── */}
-        <Route path="/dashboard/admin" element={<AdminDashLayout />}>
+        <Route path="/admindashboard" element={<AdminDashLayout />}>
           <Route index element={<AdminOverview />} />
           <Route path="institutions" element={<AdminInstitutions />} />
           <Route path="users" element={<AdminUsers />} />

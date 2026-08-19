@@ -56,70 +56,70 @@ const NAV_ITEMS: NavItem[] = [
     key: "overview",
     label: "Overview",
     icon: LayoutGrid,
-    path: "/dashboard/admin"
+    path: "/admindashboard"
   },
 
   {
     key: "institutions",
     label: "Institutions",
     icon: Landmark,
-    path: "/dashboard/admin/institutions"
+    path: "/admindashboard/institutions"
   },
 
   {
     key: "users",
     label: "Users",
     icon: Users,
-    path: "/dashboard/admin/users"
+    path: "/admindashboard/users"
   },
 
   {
     key: "issuers",
     label: "Issuers",
     icon: FileStack,
-    path: "/dashboard/admin/issuers"
+    path: "/admindashboard/issuers"
   },
 
   {
     key: "verification",
     label: "Verification Activity",
     icon: ShieldCheck,
-    path: "/dashboard/admin/verification"
+    path: "/admindashboard/verification"
   },
 
   {
     key: "fraud",
     label: "Fraud & Security",
     icon: ShieldAlert,
-    path: "/dashboard/admin/fraud"
+    path: "/admindashboard/fraud"
   },
 
   {
     key: "blockchain",
     label: "Blockchain",
     icon: Boxes,
-    path: "/dashboard/admin/blockchain"
+    path: "/admindashboard/blockchain"
   },
 
   {
     key: "health",
     label: "System Health",
     icon: Activity,
-    path: "/dashboard/admin/health"
+    path: "/admindashboard/health"
   },
 
   {
     key: "audit",
     label: "Audit Logs",
     icon: ScrollText,
-    path: "/dashboard/admin/audit"
+    path: "/admindashboard/audit"
   },
 
   {
     key: "settings",
     label: "Settings",
     icon: Settings,
-    path: "/dashboard/admin/settings"
+    path: "/admindashboard/settings"
   },
 ];
 
