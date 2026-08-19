@@ -1,34 +1,90 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> fc0ad022d172ee35500ecb27ca86efb061c0e543
 @import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root {
-  font-family: "Figtree", "Segoe UI", sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #111827;
-  background-color: #f8fafc;
+  font-family: "Figtree", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --navy: #000f3e;
+  --navy-2: #00174d;
+  --navy-3: #001f5c;
+  --navy-4: #002a7a;
+  --navy-5: #003199;
+
+  --blue: #0050f5;
+  --blue-2: #1a6bff;
+  --blue-3: #3381ff;
+  --blue-4: #669dff;
+  --blue-5: #99bcff;
+
+  --light-blue: #eaf1ff;
+  --light-blue-2: #dde7ff;
+  --light-blue-3: #c9daff;
+  --light-blue-4: #b6cdff;
+  --light-blue-5: #a3c0ff;
+
+  --bg: #ffffff;
+  --bg-2: #f7f9ff;
+  --bg-3: #eef2ff;
+  --bg-4: #e5e9f5;
+  --bg-5: #dde2ee;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+
+  --radius-card: 24px;
+  --radius-btn: 14px;
+  --radius-input: 14px;
+  --radius-pill: 9999px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 15, 62, 0.06), 0 1px 2px rgba(0, 15, 62, 0.04);
+  --shadow-md:
+    0 4px 16px rgba(0, 15, 62, 0.08), 0 2px 6px rgba(0, 15, 62, 0.04);
+  --shadow-lg:
+    0 8px 32px rgba(0, 15, 62, 0.1), 0 4px 12px rgba(0, 15, 62, 0.06);
+  --shadow-blue: 0 8px 32px rgba(0, 80, 245, 0.15);
 }
 
-html,
-body,
-#root {
-  margin: 0;
-  min-height: 100%;
-  font-family: "Figtree", "Segoe UI", sans-serif;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  min-height: 100vh;
-  background: #f8fafc;
-  font-family: "Figtree", "Segoe UI", sans-serif;
+  margin: 0;
+  font-family: "Figtree", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--navy);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
+  overflow-x: hidden;
 }
 
-* {
-  box-sizing: border-box;
-  font-family: "Figtree", "Segoe UI", sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@theme {
+  --color-navy: #000f3e;
+  --color-brand: #0050f5;
+  --color-brand-light: #eaf1ff;
+
+  --font-figtree: "Figtree", sans-serif;
 }
