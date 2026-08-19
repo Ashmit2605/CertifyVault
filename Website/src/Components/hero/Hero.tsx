@@ -97,14 +97,6 @@ export default function Hero() {
                 <ScanLine size={16} /> Verify a Certificate
               </Link>
             </motion.div>
-
-            <motion.p
-              className="text-sm"
-              style={{ color: 'var(--navy)', opacity: 0.4 }}
-              {...fadeUp(0.5)}
-            >
-              No complex blockchain setup required.
-            </motion.p>
           </div>
 
           {/* Right: certificate visual */}
