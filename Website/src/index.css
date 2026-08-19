@@ -1,25 +1,4 @@
-<<<<<<< HEAD
-@import "tailwindcss";
 
-@theme {
-  --color-navy: #000F3E;
-  --color-brand: #0050F5;
-  --color-brand-light: #EAF1FF;
-
-  --font-figtree: "Figtree", sans-serif;
-}
-
-html {
-  scrollbar-gutter: stable;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  overflow-y: scroll;
-  font-family: var(--font-figtree);
-}
-=======
 @import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
@@ -53,4 +32,3 @@ body {
   box-sizing: border-box;
   font-family: "Figtree", "Segoe UI", sans-serif;
 }
->>>>>>> d9232f0c95872dc01e0ffa7aef3807efefa03fc5
