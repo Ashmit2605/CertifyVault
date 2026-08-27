@@ -438,11 +438,11 @@ export default function AdminSettingsPage(): ReactElement {
                   <button
                     onClick={() => setTwoFactorEnabled((v) => !v)}
                     aria-pressed={twoFactorEnabled}
-                    className="relative h-5.75 w-10 shrink-0 rounded-full transition-colors"
+                    className="relative h-6 w-10 shrink-0 rounded-full transition-colors"
                     style={{ backgroundColor: twoFactorEnabled ? '#0050F5' : '#D5DAE3' }}
                   >
                     <span
-                      className={`absolute left-0.75 top-0.625 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform ${twoFactorEnabled ? 'translate-x-4.25' : ''
+                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${twoFactorEnabled ? 'translate-x-4' : ''
                         }`}
                     />
                   </button>
