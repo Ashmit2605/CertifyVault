@@ -25,6 +25,7 @@ import VerifierDashboard from "./Pages/VerifierDashLayout/VerifierDashboard";
 import VerificationHistory from "./Pages/VerifierDashLayout/VerificationHistory";
 import SavedVerifications from "./Pages/VerifierDashLayout/SavedVerifications";
 import VerificationReports from "./Pages/VerifierDashLayout/VerificationReports";
+import VerifierProfile from "./Pages/VerifierDashLayout/VerifierProfile";
 
 // ==================== ISSUER DASHBOARD ====================
 import IssuerDashLayout from "./Pages/IssuerDashLayout/IssuerDashLayout";
@@ -119,7 +120,6 @@ function ComingSoon({ label }: { label: string }) {
   );
 }
 
-
 export default function App() {
   return (
     <Routes>
@@ -128,141 +128,140 @@ export default function App() {
       <Route path="/app/register" element={<SignupPage />} />
       <Route path="/app/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* ── Public marketing pages ── */}
-        <Route element={<Layout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/how-it-works" element={<HowItWorks />} />
-          <Route path="/for-issuers" element={<Issuers />} />
-          <Route path="/for-holders" element={<Holders />} />
-          <Route path="/for-verifiers" element={<Verifiers />} />
-          <Route path="/security" element={<Security />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/fraud-detection" element={<FraudDetection />} />
-          <Route path="/privacy" element={<PrivacyPolicyPage />} />
-          <Route path="/blockchain" element={<BlockchainPage />} />
-          <Route path="/docs" element={<Documentation />} />
-          <Route path="/product-privacy" element={<Privacy />} />
-        </Route>
+      {/* ── Public marketing pages ── */}
+      <Route element={<Layout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/for-issuers" element={<Issuers />} />
+        <Route path="/for-holders" element={<Holders />} />
+        <Route path="/for-verifiers" element={<Verifiers />} />
+        <Route path="/security" element={<Security />} />
+        <Route path="/verify" element={<Verify />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/fraud-detection" element={<FraudDetection />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/blockchain" element={<BlockchainPage />} />
+        <Route path="/docs" element={<Documentation />} />
+        <Route path="/product-privacy" element={<Privacy />} />
+      </Route>
 
-        {/* ──────────────── DASHBOARDS (WITH /app PREFIX) ──────────────── */}
+      {/* ──────────────── DASHBOARDS (WITH /app PREFIX) ──────────────── */}
 
-        {/* ── Verifier Dashboard ── */}
-        <Route path="/verifierdashboard" element={<VerifierDashLayout />}>
-          <Route index element={<VerifierDashboard />} />
-          <Route path="verify" element={<Verify />} />
-          <Route path="history" element={<VerificationHistory />} />
-          <Route path="saved" element={<SavedVerifications />} />
-          <Route path="reports" element={<VerificationReports />} />
-          <Route path="profile" element={<ComingSoon label="Profile" />} />
-        </Route>
+      {/* ── Verifier Dashboard ── */}
+      <Route path="/verifierdashboard" element={<VerifierDashLayout />}>
+        <Route index element={<VerifierDashboard />} />
+        <Route path="verify" element={<Verify />} />
+        <Route path="history" element={<VerificationHistory />} />
+        <Route path="saved" element={<SavedVerifications />} />
+        <Route path="reports" element={<VerificationReports />} />
+        <Route path="profile" element={<VerifierProfile />} />
+      </Route>
 
-        {/* ── Holder Dashboard ── */}
-        <Route path="/holderdashboard" element={<HolderDashboardLayout />}>
-          <Route index element={<HolderHome />} />
-          <Route path="certificates" element={<MyCertificates />} />
-          <Route path="verification" element={<HolderVerification />} />
-          <Route path="share" element={<Share />} />
-          <Route path="activity" element={<Activity />} />
-          <Route path="profile" element={<HolderProfile />} />
-        </Route>
+      {/* ── Holder Dashboard ── */}
+      <Route path="/holderdashboard" element={<HolderDashboardLayout />}>
+        <Route index element={<HolderHome />} />
+        <Route path="certificates" element={<MyCertificates />} />
+        <Route path="verification" element={<HolderVerification />} />
+        <Route path="share" element={<Share />} />
+        <Route path="activity" element={<Activity />} />
+        <Route path="profile" element={<HolderProfile />} />
+      </Route>
 
-        {/* ── Issuer Dashboard ── */}
+      {/* ── Issuer Dashboard ── */}
+      <Route
+        path="/issuerdashboard"
+        element={
+          <TemplatesProvider>
+            <IssuerDashLayout />
+          </TemplatesProvider>
+        }
+      >
+        <Route index element={<Overview />} />
+
+        {/* Certificates */}
+        <Route path="certificates" element={<Certificates />} />
+        <Route path="issue" element={<IssueCertificate />} />
+        <Route path="templates" element={<Templates />} />
+        <Route path="templates/:templateId" element={<TemplateEditor />} />
+
+        {/* Verification */}
+        <Route path="verification" element={<Verification />} />
+
+        {/* Revocations */}
         <Route
-          path="/issuerdashboard"
+          path="revocations"
           element={
-            <TemplatesProvider>
-              <IssuerDashLayout />
-            </TemplatesProvider>
+            <RevocationsProvider>
+              <Revocations />
+            </RevocationsProvider>
           }
-        >
-          <Route index element={<Overview />} />
+        />
 
-          {/* Certificates */}
-          <Route path="certificates" element={<Certificates />} />
-          <Route path="issue" element={<IssueCertificate />} />
-          <Route path="templates" element={<Templates />} />
-          <Route path="templates/:templateId" element={<TemplateEditor />} />
+        <Route
+          path="revocations/:certId"
+          element={
+            <RevocationsProvider>
+              <RevokeCertificate />
+            </RevocationsProvider>
+          }
+        />
 
-          {/* Verification */}
-          <Route path="verification" element={<Verification />} />
+        {/* Fraud Alerts */}
+        <Route path="fraud-alerts" element={<FraudAlerts />} />
 
-          {/* Revocations */}
-          <Route
-            path="revocations"
-            element={
-              <RevocationsProvider>
-                <Revocations />
-              </RevocationsProvider>
-            }
-          />
+        {/* Analytics */}
+        <Route path="analytics" element={<Analytics />} />
 
-          <Route
-            path="revocations/:certId"
-            element={
-              <RevocationsProvider>
-                <RevokeCertificate />
-              </RevocationsProvider>
-            }
-          />
+        {/* Audit Logs */}
+        <Route path="audit-logs" element={<AuditLogs />} />
 
-          {/* Fraud Alerts */}
-          <Route path="fraud-alerts" element={<FraudAlerts />} />
+        {/* Students */}
+        <Route
+          path="students"
+          element={
+            <StudentsProvider>
+              <Students />
+            </StudentsProvider>
+          }
+        />
 
-          {/* Analytics */}
-          <Route path="analytics" element={<Analytics />} />
+        <Route
+          path="students/:studentId"
+          element={
+            <StudentsProvider>
+              <StudentCertificateHistory />
+            </StudentsProvider>
+          }
+        />
 
-          {/* Audit Logs */}
-          <Route path="audit-logs" element={<AuditLogs />} />
-
-          {/* Students */}
-          <Route
-            path="students"
-            element={
-              <StudentsProvider>
-                <Students />
-              </StudentsProvider>
-            }
-          />
-
-          <Route
-            path="students/:studentId"
-            element={
-              <StudentsProvider>
-                <StudentCertificateHistory />
-              </StudentsProvider>
-            }
-          />
-
-          {/* Settings */}
-          <Route path="settings" element={<SettingsSidebar />}>
-            <Route path="profile" element={<Profile />} />
-            <Route path="institution" element={<Institution />} />
-            <Route path="users-permissions" element={<UsersPermissions />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="security" element={<IssuerSecurity />} />
-            <Route path="branding" element={<Branding />} />
-          </Route>
+        {/* Settings */}
+        <Route path="settings" element={<SettingsSidebar />}>
+          <Route path="profile" element={<Profile />} />
+          <Route path="institution" element={<Institution />} />
+          <Route path="users-permissions" element={<UsersPermissions />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="security" element={<IssuerSecurity />} />
+          <Route path="branding" element={<Branding />} />
         </Route>
+      </Route>
 
-        {/* ── Admin Dashboard ── */}
-        <Route path="/admindashboard" element={<AdminDashLayout />}>
-          <Route index element={<AdminOverview />} />
-          <Route path="institutions" element={<AdminInstitutions />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="issuers" element={<AdminIssuers />} />
-          <Route path="verification" element={<AdminVerification />} />
-          <Route path="fraud" element={<AdminFraud />} />
-          <Route path="blockchain" element={<AdminBlockchain />} />
-          <Route path="health" element={<AdminHealth />} />
-          <Route path="audit" element={<AdminAudit />} />
-          <Route path="settings" element={<AdminSettings />} />
-        </Route>
+      {/* ── Admin Dashboard ── */}
+      <Route path="/admindashboard" element={<AdminDashLayout />}>
+        <Route index element={<AdminOverview />} />
+        <Route path="institutions" element={<AdminInstitutions />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="issuers" element={<AdminIssuers />} />
+        <Route path="verification" element={<AdminVerification />} />
+        <Route path="fraud" element={<AdminFraud />} />
+        <Route path="blockchain" element={<AdminBlockchain />} />
+        <Route path="health" element={<AdminHealth />} />
+        <Route path="audit" element={<AdminAudit />} />
+        <Route path="settings" element={<AdminSettings />} />
+      </Route>
 
-        {/* ── 404 Fallback (Must be last) ── */}
-        <Route path="*" element={<ComingSoon label="Page Not Found" />} />
-      </Routes>
-    
+      {/* ── 404 Fallback (Must be last) ── */}
+      <Route path="*" element={<ComingSoon label="Page Not Found" />} />
+    </Routes>
   );
 }
