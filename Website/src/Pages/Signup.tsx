@@ -78,14 +78,14 @@ function RightPanel({ step }: { step: number }) {
 
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2.5 no-underline relative z-10">
-       
-          <img src={Logo} alt="CertifyVault" className="h-7 w-auto" />
-        
+
+        <img src={Logo} alt="CertifyVault" className="h-7 w-auto" />
+
         <span className="font-bold text-lg text-white">CertifyVault</span>
       </Link>
 
       {/* Journey visualization */}
-      <div className="relative z-10 flex flex-col gap-0">
+      <div className="relative z-10 flex flex-col gap-0 w-full max-w-[260px] mx-auto">
         <p className="text-xs font-semibold tracking-widest mb-6" style={{ color: 'rgba(255,255,255,0.35)' }}>
           THE TRUST JOURNEY
         </p>
@@ -101,13 +101,13 @@ function RightPanel({ step }: { step: number }) {
                     background: isDone
                       ? 'rgba(22,163,74,0.3)'
                       : isActive
-                      ? 'rgba(0,80,245,0.4)'
-                      : 'rgba(255,255,255,0.06)',
+                        ? 'rgba(0,80,245,0.4)'
+                        : 'rgba(255,255,255,0.06)',
                     borderColor: isDone
                       ? '#4ADE80'
                       : isActive
-                      ? 'var(--blue-4)'
-                      : 'rgba(255,255,255,0.12)',
+                        ? 'var(--blue-4)'
+                        : 'rgba(255,255,255,0.12)',
                     scale: isActive ? 1.1 : 1,
                   }}
                   style={{ border: '1.5px solid' }}

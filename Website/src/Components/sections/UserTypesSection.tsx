@@ -40,7 +40,7 @@ const userTypes = [
 
 export default function UserTypesSection() {
   return (
-    <section className="py-24" style={{ background: 'var(--bg)' }}>
+    <section className="min-h-screen flex items-center py-12" style={{ background: 'var(--bg)' }}>
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           className="text-center max-w-2xl mx-auto mb-16"

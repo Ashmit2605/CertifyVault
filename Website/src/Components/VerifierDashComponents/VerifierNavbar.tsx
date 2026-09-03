@@ -5,11 +5,11 @@ import { Search, Bell, ChevronDown, Menu, X, LayoutDashboard, ScanLine, History,
 import Logo from '../../assets/Logo.png'
 
 const navItems = [
-  { label: 'Dashboard', href: '/verifierdashboard',          icon: LayoutDashboard },
-  { label: 'Verify',    href: '/verifierdashboard/verify',   icon: ScanLine        },
-  { label: 'History',   href: '/verifierdashboard/history',  icon: History         },
-  { label: 'Saved',     href: '/verifierdashboard/saved',    icon: Bookmark        },
-  { label: 'Reports',   href: '/verifierdashboard/reports',  icon: FileText        },
+  { label: 'Dashboard', href: '/verifierdashboard', icon: LayoutDashboard },
+  { label: 'Verify', href: '/verifierdashboard/verify', icon: ScanLine },
+  { label: 'History', href: '/verifierdashboard/history', icon: History },
+  { label: 'Saved', href: '/verifierdashboard/saved', icon: Bookmark },
+  { label: 'Reports', href: '/verifierdashboard/reports', icon: FileText },
 ]
 
 export default function VerifierNavbar() {
@@ -26,7 +26,7 @@ export default function VerifierNavbar() {
   useEffect(() => setMobileOpen(false), [location.pathname])
 
   const isActive = (href: string) =>
-    href === '/verifierdashboard'   
+    href === '/verifierdashboard'
       ? location.pathname === '/verifierdashboard'
       : location.pathname.startsWith(href)
 
@@ -102,13 +102,18 @@ export default function VerifierNavbar() {
               <Bell size={16} />
               <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--blue)' }} />
             </button>
-            <div className="flex items-center gap-2 pl-2 border-l" style={{ borderColor: 'var(--bg-5)' }}>
+            <Link
+              to="/verifierdashboard/profile"
+              aria-label="Open verifier profile settings"
+              className="flex items-center gap-2 pl-2 border-l no-underline transition-opacity hover:opacity-80"
+              style={{ borderColor: 'var(--bg-5)' }}
+            >
               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'var(--navy)' }}>
                 V
               </div>
               <span className="text-sm font-semibold" style={{ color: 'var(--navy)' }}>Verifier</span>
               <ChevronDown size={13} style={{ color: 'var(--navy)', opacity: 0.4 }} />
-            </div>
+            </Link>
           </div>
 
           {/* Mobile toggle */}

@@ -9,8 +9,6 @@ import BlockchainSection from '../Components/sections/BlockchainSection'
 import SecuritySection from '../Components/sections/SecuritySection'
 import HowItWorksSection from '../Components/sections/HowItWorksSection'
 import PrivacySection from '../Components/sections/PrivacySection'
-import TestimonialsSection from '../Components/sections/TestimonialsSection'
-import FAQSection from '../Components/sections/FAQSection'
 import CTASection from '../Components/sections/CTASection'
 
 export default function Home() {
@@ -27,8 +25,6 @@ export default function Home() {
       <SecuritySection />
       <HowItWorksSection />
       <PrivacySection />
-      <TestimonialsSection />
-      <FAQSection />
       <CTASection />
     </>
   )
