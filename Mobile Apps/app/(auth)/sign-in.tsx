@@ -34,13 +34,28 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('')
   const [showPw, setShowPw]     = useState(false)
   const [loading, setLoading]   = useState(false)
+  const [role, setRole]         = useState<'verifier' | 'holder'>('verifier')
   const [focusedField, setFocusedField] = useState<'email' | 'password' | null>(null)
+  const [error, setError]       = useState('')
 
   const handleSubmit = () => {
+    const normalizedEmail = email.trim()
+
+    if (!normalizedEmail || !password) {
+      setError('Enter your email address and password to continue.')
+      return
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setError('Enter a valid email address.')
+      return
+    }
+
+    setError('')
     setLoading(true)
     setTimeout(() => {
       setLoading(false)
-      router.replace('/(verifier)')
+      router.replace(role === 'holder' ? '/(holder)' : '/(verifier)')
     }, 1800)
   }
 
@@ -56,6 +71,28 @@ export default function SignInScreen() {
         <View style={s.formWrap}>
           <Text style={s.heading}>Welcome back</Text>
           <Text style={s.subheading}>Sign in to your CertifyVault account</Text>
+
+          <View style={s.roleSwitcher}>
+            {(['verifier', 'holder'] as const).map(accountRole => (
+              <TouchableOpacity
+                key={accountRole}
+                onPress={() => setRole(accountRole)}
+                style={[s.roleButton, role === accountRole && s.roleButtonActive]}
+              >
+                <Ionicons
+                  name={accountRole === 'holder' ? 'school-outline' : 'scan-outline'}
+
+          
+                  size={14}
+                  color={role === accountRole ? 'white' : Brand.navy}
+                />
+                <Text style={[s.roleButtonText, role === accountRole && s.roleButtonTextActive]}>
+                  {accountRole === 'holder' ? 'Certificate Holder' : 'Verifier'}
+                </Text>
+                {error ? <Text style={s.errorText}>{error}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Email */}
           <View style={s.fieldGroup}>
@@ -169,10 +206,16 @@ const s = StyleSheet.create({
   formWrap:        { padding: 28, gap: 0 },
   heading:         { fontSize: 28, fontWeight: '800', color: Brand.navy, letterSpacing: -0.5, marginBottom: 6 },
   subheading:      { fontSize: 13, color: Brand.navy, opacity: 0.5, marginBottom: 28 },
+  roleSwitcher:    { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  roleButton:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: Brand.bg5, backgroundColor: 'white' },
+  roleButtonActive:{ backgroundColor: Brand.blue, borderColor: Brand.blue },
+  roleButtonText:  { fontSize: 11, fontWeight: '600', color: Brand.navy, opacity: 0.65 },
+  roleButtonTextActive: { color: 'white', opacity: 1 },
   fieldGroup:      { marginBottom: 16 },
   label:           { fontSize: 11, fontWeight: '600', color: Brand.navy, opacity: 0.6, marginBottom: 6 },
   labelRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   forgotLink:      { fontSize: 11, fontWeight: '600', color: Brand.blue },
+  errorText:       { fontSize: 12, fontWeight: '600', color: '#C0392B', marginTop: -4, marginBottom: 8 },
   input:           { width: '100%', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, borderColor: Brand.bg5, fontSize: 14, color: Brand.navy, backgroundColor: 'white' },
   inputFocused:    { borderColor: Brand.blue, shadowColor: Brand.blue, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 2 },
   passwordWrap:    { position: 'relative' },
