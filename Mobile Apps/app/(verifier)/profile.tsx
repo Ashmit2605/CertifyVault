@@ -66,7 +66,7 @@ function ConfirmModal({ visible, onCancel, onConfirm }: {
 
           <Text style={s.modalTitle}>Log out of all devices?</Text>
           <Text style={s.modalBody}>
-            This immediately ends every active session, including the one you're using right now.
+            This immediately ends every active session, including the one you&apos;re using right now.
           </Text>
 
           <View style={s.modalActions}>
