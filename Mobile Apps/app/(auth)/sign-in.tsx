@@ -16,7 +16,7 @@ import { Brand } from '@/constants/theme'
 type Role = 'verifier' | 'issuer' | 'holder'
 
 export default function SignInScreen() {
-  const router = useRouter()
+  const router = useRouter() as any
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -50,14 +50,13 @@ export default function SignInScreen() {
 
     setTimeout(() => {
       setLoading(false)
-
       // Role-based navigation
       if (role === 'verifier') {
         router.replace('/(verifier)')
       } else if (role === 'issuer') {
         router.replace('/(issuer)/dashboard')
       } else {
-        //router.replace('/(holder)')
+        router.replace('/(holder)')
       }
     }, 1200)
   }
@@ -97,6 +96,15 @@ export default function SignInScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.formWrap}>
+
+          <TouchableOpacity
+            style={s.backButton}
+            onPress={() => router.replace('/(tabs)/home')}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="arrow-back" size={17} color={Brand.blue} />
+            <Text style={s.backButtonText}>Back to Home</Text>
+          </TouchableOpacity>
 
           {/* Header */}
           <Text style={s.heading}>Welcome back</Text>
@@ -349,6 +357,20 @@ const s = StyleSheet.create({
   formWrap: {
     padding: 28,
     gap: 0,
+  },
+
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginBottom: 28,
+  },
+
+  backButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Brand.blue,
   },
 
   heading: {
