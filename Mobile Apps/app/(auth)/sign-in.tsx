@@ -218,7 +218,7 @@ export default function SignInScreen() {
                 Password
               </Text>
 
-              <TouchableOpacity activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
                 <Text style={s.forgotLink}>
                   Forgot password?
                 </Text>
@@ -324,7 +324,7 @@ export default function SignInScreen() {
           <Text style={s.signupText}>
             Don't have an account?{' '}
 
-            <Text style={s.signupLink}>
+            <Text style={s.signupLink} onPress={() => router.push('/(auth)/create_one_free')}>
               Create one free
             </Text>
           </Text>
