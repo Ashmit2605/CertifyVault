@@ -1,8 +1,12 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { useRef, useState } from 'react'
+import {
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  Animated, Easing, Pressable, useWindowDimensions,
+} from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Brand } from '@/constants/theme'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
@@ -46,162 +50,374 @@ const roles: { icon: IoniconsName; role: string; title: string; desc: string; fe
   },
 ]
 
+// Fixed collapsed height — the sheet never changes size when scrolling.
+// The content inside animates instead.
+const COLLAPSED_BASE = 150
+
 export default function HomeScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
+  const { height: winH } = useWindowDimensions()
+
+  const collapsedH = COLLAPSED_BASE + insets.bottom
+  const expandedH  = Math.max(430, winH * 0.6) + insets.bottom
+
+  const progress = useRef(new Animated.Value(0)).current
+  const scrollY  = useRef(new Animated.Value(0)).current
+  const [open, setOpen] = useState(false)
+
+  const setSheet = (toOpen: boolean) => {
+    setOpen(toOpen)
+    Animated.timing(progress, {
+      toValue: toOpen ? 1 : 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // height can't use the native driver
+    }).start()
+  }
+
+  // ── Sheet height ──────────────────────────────────────────────
+  // Only animates between collapsed → expanded when the sheet opens.
+  // Scrolling no longer affects the height, so nothing gets clipped.
+  const sheetHeight = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [collapsedH, expandedH],
+  })
+
+  // ── Collapsed content animations (driven by scrollY) ──────────
+  // As the user scrolls, the big CTA panel morphs into a compact bar.
+
+  // The full "brand + heading + sub + button" block shrinks & drifts up
+  const ctaScale = scrollY.interpolate({
+    inputRange: [0, 120, 220],
+    outputRange: [1, 0.92, 0.82],
+    extrapolate: 'clamp',
+  })
+
+  const ctaTranslateY = scrollY.interpolate({
+    inputRange: [0, 120, 220],
+    outputRange: [0, 35, 85],
+    extrapolate: 'clamp',
+  })
+
+  // Full panel fades out as it shrinks away
+  const ctaOpacity = scrollY.interpolate({
+    inputRange: [0, 100, 180],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  })
+
+  // Compact bar fades in once the full panel is gone
+  const compactOpacity = scrollY.interpolate({
+    inputRange: [140, 200, 240],
+    outputRange: [0, 0.7, 1],
+    extrapolate: 'clamp',
+  })
+
+  const compactTranslateY = scrollY.interpolate({
+    inputRange: [140, 240],
+    outputRange: [20, 0],
+    extrapolate: 'clamp',
+  })
+
+  // ── Sheet layer cross-fade (collapsed ↔ expanded login) ───────
+  const collapsedOpacity = progress.interpolate({
+    inputRange: [0, 0.4],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  })
+  const expandedOpacity = progress.interpolate({
+    inputRange: [0.5, 1],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  })
+
+  const goToLogin = () => router.push('/(auth)/sign-in')
 
   return (
-    <SafeAreaView style={s.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+    <View style={s.root}>
+      {/* ───────── Scrollable content (upper part) ───────── */}
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <Animated.ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: collapsedH + 24 }}
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            {
+              useNativeDriver: false,
+              listener: (event: any) => {
+                if (open && event.nativeEvent.contentOffset.y > 10) {
+                  setSheet(false)
+                }
+              },
+            }
+          )}
+          onTouchStart={() => {
+            if (open) {
+              setSheet(false)
+            }
+          }}
+        >
 
-        {/* ── Hero ── */}
-        <View style={s.hero}>
-          <View style={s.logoPill}>
-            <Ionicons name="shield-checkmark" size={14} color={Brand.blue} />
-            <Text style={s.logoPillText}>TRUSTED DIGITAL CREDENTIALS</Text>
-          </View>
-          <Text style={s.heroHeading}>Verify Every Credential.{' '}
-            <Text style={s.heroAccent}>Trust Every Achievement.</Text>
-          </Text>
-          <Text style={s.heroSub}>
-            CertifyVault lets institutions securely issue, store, and verify academic credentials — with AI-powered fraud detection.
-          </Text>
-          <View style={s.heroBtns}>
-            <TouchableOpacity style={s.btnPrimary} onPress={() => router.push('/(auth)/sign-in')} activeOpacity={0.85}>
-              <Text style={s.btnPrimaryText}>Get Started</Text>
-              <Ionicons name="arrow-forward" size={15} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.btnOutline} onPress={() => router.push('/(verifier)')} activeOpacity={0.8}>
-              <Ionicons name="scan-outline" size={15} color={Brand.navy} />
-              <Text style={s.btnOutlineText}>Verify a Certificate</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ── Mini cert card ── */}
-        <View style={s.cardWrap}>
-          <View style={s.certCard}>
-            <View style={s.certCardHeader}>
-              <View style={s.certHeaderLeft}>
-                <View style={s.certIconBox}>
-                  <Ionicons name="shield-checkmark" size={11} color="white" />
-                </View>
-                <Text style={s.certBrand}>CERTIFYVAULT</Text>
-              </View>
-              <View style={s.verifiedPill}>
-                <View style={s.verifiedDot} />
-                <Text style={s.verifiedText}>VERIFIED</Text>
-              </View>
+          {/* ── Hero ── */}
+          <View style={s.hero}>
+            <View style={s.logoPill}>
+              <Ionicons name="shield-checkmark" size={14} color={Brand.blue} />
+              <Text style={s.logoPillText}>TRUSTED DIGITAL CREDENTIALS</Text>
             </View>
-            <View style={s.certBody}>
-              <Text style={s.certLabel}>CERTIFICATE OF ACHIEVEMENT</Text>
-              <Text style={s.certTitle}>Bachelor of Technology</Text>
-              <Text style={s.certSub}>Computer Engineering</Text>
-              <View style={s.certDivider} />
-              <View style={s.certMeta}>
-                <View>
-                  <Text style={s.certMetaLabel}>AWARDED TO</Text>
-                  <Text style={s.certMetaVal}>Student Name</Text>
-                </View>
-                <View style={s.certQr}>
-                  <Ionicons name="qr-code" size={22} color="white" />
-                </View>
-              </View>
-              <View style={s.certChecks}>
-                {['SHA-256  ✓ MATCHED', 'BLOCKCHAIN  ✓ VERIFIED'].map(row => (
-                  <View key={row} style={s.certCheckRow}>
-                    <Text style={s.certCheckLabel}>{row.split('  ')[0]}</Text>
-                    <Text style={s.certCheckVal}>{row.split('  ')[1]}</Text>
-                  </View>
-                ))}
-              </View>
+            <Text style={s.heroHeading}>Verify Every Credential.{' '}
+              <Text style={s.heroAccent}>Trust Every Achievement.</Text>
+            </Text>
+            <Text style={s.heroSub}>
+              CertifyVault lets institutions securely issue, store, and verify academic credentials — with AI-powered fraud detection.
+            </Text>
+            <View style={s.heroBtns}>
+              <TouchableOpacity style={s.btnPrimary} onPress={() => setSheet(true)} activeOpacity={0.85}>
+                <Text style={s.btnPrimaryText}>Get Started</Text>
+                <Ionicons name="arrow-forward" size={15} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btnOutline} onPress={() => router.push('/(verifier)')} activeOpacity={0.8}>
+                <Ionicons name="scan-outline" size={15} color={Brand.navy} />
+                <Text style={s.btnOutlineText}>Verify a Certificate</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
 
-        {/* ── Trust bar ── */}
-        <View style={s.section}>
-          <Text style={s.eyebrow}>SECURE BY DESIGN</Text>
-          <View style={s.trustGrid}>
-            {trustItems.map(item => (
-              <View key={item.label} style={s.trustItem}>
-                <Ionicons name={item.icon} size={14} color={Brand.blue} />
-                <Text style={s.trustLabel}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* ── How it works ── */}
-        <View style={[s.section, s.sectionAlt]}>
-          <Text style={s.eyebrow}>HOW IT WORKS</Text>
-          <Text style={s.sectionTitle}>From Issuance to{'\n'}Verification in Four Steps</Text>
-          <View style={s.stepsList}>
-            {steps.map((step, i) => (
-              <View key={step.num} style={s.stepRow}>
-                <View style={s.stepLeft}>
-                  <View style={s.stepIconBox}>
-                    <Ionicons name={step.icon} size={16} color="white" />
+          {/* ── Mini cert card ── */}
+          <View style={s.cardWrap}>
+            <View style={s.certCard}>
+              <View style={s.certCardHeader}>
+                <View style={s.certHeaderLeft}>
+                  <View style={s.certIconBox}>
+                    <Ionicons name="shield-checkmark" size={11} color="white" />
                   </View>
-                  {i < steps.length - 1 && <View style={s.stepLine} />}
+                  <Text style={s.certBrand}>CERTIFYVAULT</Text>
                 </View>
-                <View style={s.stepContent}>
-                  <Text style={s.stepNum}>{step.num}</Text>
-                  <Text style={s.stepTitle}>{step.title}</Text>
-                  <Text style={s.stepDesc}>{step.desc}</Text>
+                <View style={s.verifiedPill}>
+                  <View style={s.verifiedDot} />
+                  <Text style={s.verifiedText}>VERIFIED</Text>
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
-
-        {/* ── Roles ── */}
-        <View style={s.section}>
-          <Text style={s.eyebrow}>BUILT FOR EVERYONE</Text>
-          <Text style={s.sectionTitle}>Built for Everyone Who{'\n'}Touches a Credential</Text>
-          <View style={s.rolesList}>
-            {roles.map(role => (
-              <View key={role.role} style={s.roleCard}>
-                <View style={s.roleCardTop}>
-                  <View style={s.roleIconBox}>
-                    <Ionicons name={role.icon} size={18} color={Brand.blue} />
+              <View style={s.certBody}>
+                <Text style={s.certLabel}>CERTIFICATE OF ACHIEVEMENT</Text>
+                <Text style={s.certTitle}>Bachelor of Technology</Text>
+                <Text style={s.certSub}>Computer Engineering</Text>
+                <View style={s.certDivider} />
+                <View style={s.certMeta}>
+                  <View>
+                    <Text style={s.certMetaLabel}>AWARDED TO</Text>
+                    <Text style={s.certMetaVal}>Student Name</Text>
                   </View>
-                  <Text style={s.roleTag}>{role.role}</Text>
+                  <View style={s.certQr}>
+                    <Ionicons name="qr-code" size={22} color="white" />
+                  </View>
                 </View>
-                <Text style={s.roleTitle}>{role.title}</Text>
-                <Text style={s.roleDesc}>{role.desc}</Text>
-                <View style={s.roleFeatures}>
-                  {role.features.map(f => (
-                    <View key={f} style={s.roleFeatureItem}>
-                      <View style={s.roleDot} />
-                      <Text style={s.roleFeatureText}>{f}</Text>
+                <View style={s.certChecks}>
+                  {['SHA-256  ✓ MATCHED', 'BLOCKCHAIN  ✓ VERIFIED'].map(row => (
+                    <View key={row} style={s.certCheckRow}>
+                      <Text style={s.certCheckLabel}>{row.split('  ')[0]}</Text>
+                      <Text style={s.certCheckVal}>{row.split('  ')[1]}</Text>
                     </View>
                   ))}
                 </View>
               </View>
-            ))}
+            </View>
           </View>
-        </View>
 
-        {/* ── CTA ── */}
-        <View style={s.cta}>
-          <Text style={s.ctaHeading}>Your credentials.{'\n'}Their trust.{'\n'}
-            <Text style={s.ctaAccent}>One platform.</Text>
+          {/* ── Trust bar ── */}
+          <View style={s.section}>
+            <Text style={s.eyebrow}>SECURE BY DESIGN</Text>
+            <View style={s.trustGrid}>
+              {trustItems.map(item => (
+                <View key={item.label} style={s.trustItem}>
+                  <Ionicons name={item.icon} size={14} color={Brand.blue} />
+                  <Text style={s.trustLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* ── How it works ── */}
+          <View style={[s.section, s.sectionAlt]}>
+            <Text style={s.eyebrow}>HOW IT WORKS</Text>
+            <Text style={s.sectionTitle}>From Issuance to{'\n'}Verification in Four Steps</Text>
+            <View style={s.stepsList}>
+              {steps.map((step, i) => (
+                <View key={step.num} style={s.stepRow}>
+                  <View style={s.stepLeft}>
+                    <View style={s.stepIconBox}>
+                      <Ionicons name={step.icon} size={16} color="white" />
+                    </View>
+                    {i < steps.length - 1 && <View style={s.stepLine} />}
+                  </View>
+                  <View style={s.stepContent}>
+                    <Text style={s.stepNum}>{step.num}</Text>
+                    <Text style={s.stepTitle}>{step.title}</Text>
+                    <Text style={s.stepDesc}>{step.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* ── Roles ── */}
+          <View style={s.section}>
+            <Text style={s.eyebrow}>BUILT FOR EVERYONE</Text>
+            <Text style={s.sectionTitle}>Built for Everyone Who{'\n'}Touches a Credential</Text>
+            <View style={s.rolesList}>
+              {roles.map(role => (
+                <View key={role.role} style={s.roleCard}>
+                  <View style={s.roleCardTop}>
+                    <View style={s.roleIconBox}>
+                      <Ionicons name={role.icon} size={18} color={Brand.blue} />
+                    </View>
+                    <Text style={s.roleTag}>{role.role}</Text>
+                  </View>
+                  <Text style={s.roleTitle}>{role.title}</Text>
+                  <Text style={s.roleDesc}>{role.desc}</Text>
+                  <View style={s.roleFeatures}>
+                    {role.features.map(f => (
+                      <View key={f} style={s.roleFeatureItem}>
+                        <View style={s.roleDot} />
+                        <Text style={s.roleFeatureText}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+        </Animated.ScrollView>
+      </SafeAreaView>
+
+      {/* ───────── Dim background when sheet is expanded ───────── */}
+      <Animated.View
+        pointerEvents={open ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, s.overlay, { opacity: progress }]}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setSheet(false)} />
+      </Animated.View>
+
+      {/* ───────── Bottom sheet ───────── */}
+      <Animated.View style={[s.sheet, { height: sheetHeight }]}>
+
+        {/* State 1 — collapsed: full CTA panel morphs into compact bar */}
+        <Animated.View
+          pointerEvents={open ? 'none' : 'auto'}
+          style={[
+            s.sheetLayer,
+            {
+              opacity: collapsedOpacity,
+              paddingBottom: insets.bottom + 16,
+            },
+          ]}
+        >
+          {/* Full CTA panel — shrinks, drifts up, fades out on scroll */}
+          <Animated.View
+            style={{
+              opacity: ctaOpacity,
+              transform: [
+                { translateY: ctaTranslateY },
+                { scale: ctaScale },
+              ],
+            }}
+          >
+            <View style={s.brandRow}>
+              <View style={s.brandIcon}>
+                <Ionicons name="shield-checkmark" size={16} color="white" />
+              </View>
+              <Text style={s.brandText}>CertifyVault</Text>
+            </View>
+            <Text style={s.sheetHeading}>Your credentials. Their trust.{'\n'}
+              <Text style={s.sheetAccent}>One platform.</Text>
+            </Text>
+            <Text style={s.sheetSub}>
+              Build a future where every achievement can be verified — instantly, securely, and without doubt.
+            </Text>
+            <TouchableOpacity style={s.sheetBtn} onPress={() => setSheet(true)} activeOpacity={0.85}>
+              <Text style={s.btnPrimaryText}>Get Started</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Compact bar — fades in as the full panel scrolls away */}
+          <Animated.View
+            pointerEvents="box-none"
+            style={[
+              s.compactBar,
+              {
+                opacity: compactOpacity,
+                transform: [{ translateY: compactTranslateY }],
+              },
+            ]}
+          >
+            <View style={s.compactLeft}>
+              <View style={s.compactIcon}>
+                <Ionicons name="shield-checkmark" size={14} color="white" />
+              </View>
+              <Text style={s.compactBrand}>CertifyVault</Text>
+            </View>
+            <TouchableOpacity
+              style={s.compactBtn}
+              onPress={() => setSheet(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={s.compactBtnText}>Get Started</Text>
+              <Ionicons name="arrow-forward" size={13} color="white" />
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
+
+        {/* State 2 — expanded: login options */}
+        <Animated.View
+          pointerEvents={open ? 'auto' : 'none'}
+          style={[s.sheetLayer, { opacity: expandedOpacity, paddingBottom: insets.bottom + 16 }]}
+        >
+          <Pressable style={s.handleWrap} onPress={() => setSheet(false)} hitSlop={12}>
+            <View style={s.handle} />
+          </Pressable>
+
+          <Text style={s.loginTitle}>Login</Text>
+          <Text style={s.loginSub}>
+            Don't have an account?{' '}
+            <Text style={s.loginLink} onPress={goToLogin}>Sign Up</Text>
           </Text>
-          <Text style={s.ctaSub}>Build a future where every achievement can be verified — instantly, securely, and without doubt.</Text>
-          <TouchableOpacity style={s.ctaBtn} onPress={() => router.push('/(auth)/sign-in')} activeOpacity={0.85}>
-            <Text style={s.ctaBtnText}>Get Started</Text>
-            <Ionicons name="arrow-forward" size={15} color="white" />
-          </TouchableOpacity>
-        </View>
 
-      </ScrollView>
-    </SafeAreaView>
+          <TouchableOpacity style={s.sheetBtn} onPress={goToLogin} activeOpacity={0.85}>
+            <Ionicons name="mail-outline" size={17} color="white" />
+            <Text style={s.btnPrimaryText}>Continue with Email</Text>
+          </TouchableOpacity>
+
+          <Text style={s.orText}>Or Continue With</Text>
+
+          <View style={s.socialRow}>
+            <TouchableOpacity
+              style={[s.socialBtn, s.socialApple]}
+              onPress={() => { /* TODO: Apple sign-in */ }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="logo-apple" size={18} color="white" />
+              <Text style={[s.socialText, { color: 'white' }]}>Apple</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.socialBtn, s.socialGoogle]}
+              onPress={() => { /* TODO: Google sign-in */ }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="logo-google" size={16} color={Brand.navy} />
+              <Text style={[s.socialText, { color: Brand.navy }]}>Google</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </View>
   )
 }
 
 const s = StyleSheet.create({
+  root:             { flex: 1, backgroundColor: Brand.bg },
   safe:             { flex: 1, backgroundColor: Brand.bg },
-  scroll:           { paddingBottom: 40 },
 
   // Hero
   hero:             { paddingHorizontal: 24, paddingTop: 48, paddingBottom: 32, gap: 16 },
@@ -275,11 +491,40 @@ const s = StyleSheet.create({
   roleDot:          { width: 4, height: 4, borderRadius: 2, backgroundColor: Brand.blue },
   roleFeatureText:  { fontSize: 12, color: Brand.navy, opacity: 0.6 },
 
-  // CTA
-  cta:              { margin: 24, padding: 28, borderRadius: 24, backgroundColor: Brand.navy, gap: 14 },
-  ctaHeading:       { fontSize: 28, fontWeight: '800', color: 'white', letterSpacing: -0.5, lineHeight: 36 },
-  ctaAccent:        { color: Brand.blue4 },
-  ctaSub:           { fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 20 },
-  ctaBtn:           { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 13, paddingHorizontal: 20, borderRadius: 14, backgroundColor: Brand.blue, shadowColor: Brand.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 4 },
-  ctaBtnText:       { fontSize: 14, fontWeight: '700', color: 'white' },
+  // Overlay
+  overlay:          { backgroundColor: 'rgba(0,0,0,0.4)' },
+
+  // Bottom sheet
+  sheet:            { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden', shadowColor: Brand.navy, shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 20 },
+  sheetLayer:       { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 22, justifyContent: 'flex-end' },
+
+  // Sheet — collapsed (full CTA panel)
+  brandRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  brandIcon:        { width: 28, height: 28, borderRadius: 8, backgroundColor: Brand.blue, alignItems: 'center', justifyContent: 'center' },
+  brandText:        { fontSize: 24, fontWeight: '800', color: Brand.blue, letterSpacing: -0.3 },
+  sheetHeading:     { marginTop: 14, fontSize: 22, fontWeight: '800', color: Brand.navy, textAlign: 'center', letterSpacing: -0.3, lineHeight: 30 },
+  sheetAccent:      { color: Brand.blue },
+  sheetSub:         { marginTop: 8, fontSize: 13, color: Brand.navy, opacity: 0.5, textAlign: 'center', lineHeight: 20 },
+  sheetBtn:         { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 16, backgroundColor: Brand.blue, shadowColor: Brand.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 },
+
+  // Sheet — collapsed (compact bar)
+  compactBar:       { position: 'absolute', left: 24, right: 24, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  compactLeft:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  compactIcon:      { width: 26, height: 26, borderRadius: 8, backgroundColor: Brand.blue, alignItems: 'center', justifyContent: 'center' },
+  compactBrand:     { fontSize: 17, fontWeight: '800', color: Brand.navy, letterSpacing: -0.2 },
+  compactBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, backgroundColor: Brand.blue, shadowColor: Brand.blue, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 8, elevation: 3 },
+  compactBtnText:   { fontSize: 13, fontWeight: '700', color: 'white' },
+
+  // Sheet — expanded (login)
+  handleWrap:       { alignSelf: 'center', paddingBottom: 12 },
+  handle:           { width: 40, height: 4, borderRadius: 2, backgroundColor: Brand.bg4 },
+  loginTitle:       { fontSize: 26, fontWeight: '800', color: Brand.navy, textAlign: 'center', letterSpacing: -0.4 },
+  loginSub:         { marginTop: 6, marginBottom: 4, fontSize: 13, color: Brand.navy, opacity: 0.6, textAlign: 'center' },
+  loginLink:        { color: Brand.blue, fontWeight: '700' },
+  orText:           { marginTop: 20, marginBottom: 14, fontSize: 12, color: Brand.navy, opacity: 0.5, textAlign: 'center' },
+  socialRow:        { flexDirection: 'row', gap: 12 },
+  socialBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16 },
+  socialApple:      { backgroundColor: Brand.navy },
+  socialGoogle:     { backgroundColor: 'white', borderWidth: 1.5, borderColor: Brand.bg5 },
+  socialText:       { fontSize: 14, fontWeight: '600' },
 })
