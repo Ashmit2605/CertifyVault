@@ -9,7 +9,7 @@ import { HOLDER_CERTIFICATES } from '@/data/holderMockData'
 const filters = ['All', 'Degree', 'Course', 'Internship', 'Training', 'Other']
 
 export default function CertificatesScreen() {
-  const router = useRouter()
+  const router = useRouter() as any
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
   const filtered = useMemo(() => HOLDER_CERTIFICATES.filter(cert => (filter === 'All' || cert.type === filter) && `${cert.title} ${cert.issuer}`.toLowerCase().includes(query.toLowerCase())), [filter, query])

@@ -12,7 +12,7 @@ const stats = [
 ]
 
 export default function HolderHome() {
-  const router = useRouter()
+  const router = useRouter() as any
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
     <Text style={s.eyebrow}>CERTIFICATE HOLDER</Text>
     <Text style={s.title}>Good evening, Atharv</Text>

@@ -50,8 +50,9 @@ const roles: { icon: IoniconsName; role: string; title: string; desc: string; fe
   },
 ]
 
-// Height needed to fit the full CTA without clipping
-const COLLAPSED_BASE = 245
+// Fixed collapsed height — the sheet never changes size when scrolling.
+// The content inside animates instead.
+const COLLAPSED_BASE = 150
 
 export default function HomeScreen() {
   const router = useRouter()
@@ -76,49 +77,46 @@ export default function HomeScreen() {
   }
 
   // ── Sheet height ──────────────────────────────────────────────
-  // Closed height shrinks as the user scrolls: full CTA → compact bar.
-  const closedSheetHeight = scrollY.interpolate({
-    inputRange: [0, 100, 160],
-    outputRange: [
-      collapsedH,           // full CTA panel
-      120 + insets.bottom,  // mid-shrink
-      82 + insets.bottom,   // compact CTA bar
-    ],
+  // Only animates between collapsed → expanded when the sheet opens.
+  // Scrolling no longer affects the height, so nothing gets clipped.
+  const sheetHeight = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [collapsedH, expandedH],
+  })
+
+  // ── Collapsed content animations (driven by scrollY) ──────────
+  // As the user scrolls, the big CTA panel morphs into a compact bar.
+
+  // The full "brand + heading + sub + button" block shrinks & drifts up
+  const ctaScale = scrollY.interpolate({
+    inputRange: [0, 120, 220],
+    outputRange: [1, 0.92, 0.82],
     extrapolate: 'clamp',
   })
 
-  // Open/close blends from the current closed height up to expandedH.
-  const sheetHeight = Animated.add(
-    closedSheetHeight,
-    Animated.multiply(
-      progress,
-      Animated.subtract(expandedH, closedSheetHeight)
-    )
-  )
+  const ctaTranslateY = scrollY.interpolate({
+    inputRange: [0, 120, 220],
+    outputRange: [0, 35, 85],
+    extrapolate: 'clamp',
+  })
 
-  // ── Full CTA animations (fade + drift up on scroll) ───────────
-  const fullCtaOpacity = scrollY.interpolate({
-    inputRange: [0, 60, 130],
+  // Full panel fades out as it shrinks away
+  const ctaOpacity = scrollY.interpolate({
+    inputRange: [0, 100, 180],
     outputRange: [1, 0.5, 0],
     extrapolate: 'clamp',
   })
 
-  const fullCtaTranslateY = scrollY.interpolate({
-    inputRange: [0, 130],
-    outputRange: [0, 35],
-    extrapolate: 'clamp',
-  })
-
-  // ── Compact CTA animations (fade in + slide up on scroll) ─────
-  const compactCtaOpacity = scrollY.interpolate({
-    inputRange: [60, 120, 160],
+  // Compact bar fades in once the full panel is gone
+  const compactOpacity = scrollY.interpolate({
+    inputRange: [140, 200, 240],
     outputRange: [0, 0.7, 1],
     extrapolate: 'clamp',
   })
 
-  const compactCtaTranslateY = scrollY.interpolate({
-    inputRange: [60, 160],
-    outputRange: [25, 0],
+  const compactTranslateY = scrollY.interpolate({
+    inputRange: [140, 240],
+    outputRange: [20, 0],
     extrapolate: 'clamp',
   })
 
@@ -305,74 +303,73 @@ export default function HomeScreen() {
       {/* ───────── Bottom sheet ───────── */}
       <Animated.View style={[s.sheet, { height: sheetHeight }]}>
 
-        {/* ── FULL CTA (visible at top, fades out on scroll) ── */}
+        {/* State 1 — collapsed: full CTA panel morphs into compact bar */}
         <Animated.View
           pointerEvents={open ? 'none' : 'auto'}
           style={[
             s.sheetLayer,
             {
-              opacity: Animated.multiply(collapsedOpacity, fullCtaOpacity),
+              opacity: collapsedOpacity,
               paddingBottom: insets.bottom + 16,
-              transform: [
-                { translateY: fullCtaTranslateY },
-              ],
             },
           ]}
         >
-          <View style={s.brandRow}>
-            <View style={s.brandIcon}>
-              <Ionicons name="shield-checkmark" size={16} color="white" />
-            </View>
-            <Text style={s.brandText}>CertifyVault</Text>
-          </View>
-          <Text style={s.sheetHeading}>Your credentials. Their trust.{'\n'}
-            <Text style={s.sheetAccent}>One platform.</Text>
-          </Text>
-          <Text style={s.sheetSub}>
-            Build a future where every achievement can be verified — instantly, securely, and without doubt.
-          </Text>
-          <TouchableOpacity style={s.sheetBtn} onPress={() => setSheet(true)} activeOpacity={0.85}>
-            <Text style={s.btnPrimaryText}>Get Started</Text>
-            <Ionicons name="arrow-forward" size={15} color="white" />
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* ── COMPACT CTA (fades in on scroll, replaces full CTA) ── */}
-        <Animated.View
-          pointerEvents={open ? 'none' : 'auto'}
-          style={[
-            s.compactCta,
-            {
-              opacity: Animated.multiply(
-                collapsedOpacity,
-                compactCtaOpacity
-              ),
+          {/* Full CTA panel — shrinks, drifts up, fades out on scroll */}
+          <Animated.View
+            style={{
+              opacity: ctaOpacity,
               transform: [
-                { translateY: compactCtaTranslateY },
+                { translateY: ctaTranslateY },
+                { scale: ctaScale },
               ],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={s.compactCtaButton}
-            onPress={() => setSheet(true)}
-            activeOpacity={0.85}
+            }}
           >
-            <View style={s.compactBrand}>
-              <View style={s.compactIcon}>
-                <Ionicons name="shield-checkmark" size={20} color="white" />
+            <View style={s.brandRow}>
+              <View style={s.brandIcon}>
+                <Ionicons name="shield-checkmark" size={16} color="white" />
               </View>
-              <Text style={s.compactBrandText}>CERTIFYVAULT</Text>
+              <Text style={s.brandText}>CertifyVault</Text>
             </View>
+            <Text style={s.sheetHeading}>Your credentials. Their trust.{'\n'}
+              <Text style={s.sheetAccent}>One platform.</Text>
+            </Text>
+            <Text style={s.sheetSub}>
+              Build a future where every achievement can be verified — instantly, securely, and without doubt.
+            </Text>
+            <TouchableOpacity style={s.sheetBtn} onPress={() => setSheet(true)} activeOpacity={0.85}>
+              <Text style={s.btnPrimaryText}>Get Started</Text>
+            </TouchableOpacity>
+          </Animated.View>
 
-            <View style={s.compactGetStarted}>
-              <Text style={s.compactGetStartedText}>Get Started</Text>
-              <Ionicons name="arrow-forward" size={15} color="white" />
+          {/* Compact bar — fades in as the full panel scrolls away */}
+          <Animated.View
+            pointerEvents="box-none"
+            style={[
+              s.compactBar,
+              {
+                opacity: compactOpacity,
+                transform: [{ translateY: compactTranslateY }],
+              },
+            ]}
+          >
+            <View style={s.compactLeft}>
+              <View style={s.compactIcon}>
+                <Ionicons name="shield-checkmark" size={14} color="white" />
+              </View>
+              <Text style={s.compactBrand}>CertifyVault</Text>
             </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={s.compactBtn}
+              onPress={() => setSheet(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={s.compactBtnText}>Get Started</Text>
+              <Ionicons name="arrow-forward" size={13} color="white" />
+            </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
 
-        {/* ── EXPANDED: login options ── */}
+        {/* State 2 — expanded: login options */}
         <Animated.View
           pointerEvents={open ? 'auto' : 'none'}
           style={[s.sheetLayer, { opacity: expandedOpacity, paddingBottom: insets.bottom + 16 }]}
@@ -501,7 +498,7 @@ const s = StyleSheet.create({
   sheet:            { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden', shadowColor: Brand.navy, shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 20 },
   sheetLayer:       { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 22, justifyContent: 'flex-end' },
 
-  // Sheet — collapsed (full CTA)
+  // Sheet — collapsed (full CTA panel)
   brandRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   brandIcon:        { width: 28, height: 28, borderRadius: 8, backgroundColor: Brand.blue, alignItems: 'center', justifyContent: 'center' },
   brandText:        { fontSize: 24, fontWeight: '800', color: Brand.blue, letterSpacing: -0.3 },
@@ -510,63 +507,13 @@ const s = StyleSheet.create({
   sheetSub:         { marginTop: 8, fontSize: 13, color: Brand.navy, opacity: 0.5, textAlign: 'center', lineHeight: 20 },
   sheetBtn:         { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 16, backgroundColor: Brand.blue, shadowColor: Brand.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 },
 
-  // Sheet — compact CTA (appears on scroll)
-  compactCta: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 8,
-    height: 66,
-    zIndex: 20,
-  },
-  compactCtaButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  compactBrand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  compactIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: '#0B5CFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  compactBrandText: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 2,
-    color: '#07164D',
-  },
-  compactGetStarted: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0B5CFF',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  compactGetStartedText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    marginRight: 6,
-  },
+  // Sheet — collapsed (compact bar)
+  compactBar:       { position: 'absolute', left: 24, right: 24, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  compactLeft:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  compactIcon:      { width: 26, height: 26, borderRadius: 8, backgroundColor: Brand.blue, alignItems: 'center', justifyContent: 'center' },
+  compactBrand:     { fontSize: 17, fontWeight: '800', color: Brand.navy, letterSpacing: -0.2 },
+  compactBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, backgroundColor: Brand.blue, shadowColor: Brand.blue, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 8, elevation: 3 },
+  compactBtnText:   { fontSize: 13, fontWeight: '700', color: 'white' },
 
   // Sheet — expanded (login)
   handleWrap:       { alignSelf: 'center', paddingBottom: 12 },
