@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
+import { useClerk } from "@clerk/clerk-react";
 import {
   ShieldCheck,
   Home,
@@ -34,7 +35,7 @@ const navItems: NavItem[] = [
 ];
 
 export function TopNav() {
-  const navigate = useNavigate();
+  const { signOut } = useClerk();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
@@ -45,7 +46,7 @@ export function TopNav() {
   };
   const confirmLogout = (): void => {
     setShowLogoutModal(false);
-    navigate("/app/login", { replace: true });
+    void signOut({ redirectUrl: "/app/login" });
   };
   const cancelLogout = (): void => setShowLogoutModal(false);
 

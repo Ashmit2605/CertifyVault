@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth, useClerk, useSignIn } from '@clerk/clerk-react'
 import {
   Eye, EyeOff, ShieldCheck,
   Blocks, QrCode, BadgeCheck, Lock,
@@ -144,12 +145,71 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const location = useLocation()
+  const [error, setError] = useState(() => {
+    const state: unknown = location.state
+    return typeof state === 'object' &&
+      state !== null &&
+      'authError' in state &&
+      typeof state.authError === 'string'
+      ? state.authError
+      : ''
+  })
+  const navigate = useNavigate()
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth()
+  const { signIn, isLoaded } = useSignIn()
+  const { openSignIn, setActive } = useClerk()
+  const clerkEnabled = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+
+    if (!clerkEnabled) {
+      setError('Sign-in is unavailable because authentication is not configured.')
+      return
+    }
+
+    if (!isAuthLoaded) {
+      setError('Authentication is still loading. Please try again.')
+      return
+    }
+
+    if (isSignedIn) {
+      navigate('/app/auth-callback', { replace: true })
+      return
+    }
+
+    if (!isLoaded || !signIn) {
+      setError('Authentication is still loading. Please try again.')
+      return
+    }
+
     setLoading(true)
-    // TODO: connect to real auth API
-    setTimeout(() => setLoading(false), 1800)
+
+    try {
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      })
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId })
+        navigate('/app/auth-callback', { replace: true })
+        return
+      }
+
+      setError('This account requires additional verification. Continue in the secure sign-in window.')
+      openSignIn({
+        signUpUrl: '/app/register',
+        forceRedirectUrl: '/app/auth-callback',
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to sign in. Please try again.'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -180,7 +240,11 @@ export default function LoginPage() {
               Sign in to your CertifyVault account
             </p>
 
-            
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm" style={{ color: '#B91C1C' }}>
+                {error}
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -302,10 +366,19 @@ export default function LoginPage() {
 
             {/* SSO hint */}
             <button
+              type="button"
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border text-sm font-semibold transition-all duration-200"
               style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)', background: 'white' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-2)'; e.currentTarget.style.borderColor = 'var(--bg-4)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = 'var(--bg-5)' }}
+              onClick={() => {
+                if (clerkEnabled) {
+                  openSignIn({
+                    signUpUrl: '/app/register',
+                    forceRedirectUrl: '/app/auth-callback',
+                  })
+                }
+              }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>

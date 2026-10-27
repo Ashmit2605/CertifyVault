@@ -15,6 +15,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useClerk } from "@clerk/clerk-react";
 import logo2 from "../../assets/Logo3.webp";
 
 /**
@@ -630,6 +631,7 @@ export default function AdminDashLayout() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { isMobile } = useViewport();
   const navigate = useNavigate();
+  const { signOut } = useClerk();
   const location = useLocation();
 
   // Active nav item is derived from the current route, same idea as
@@ -645,10 +647,8 @@ export default function AdminDashLayout() {
   };
 
   const handleLogoutConfirm = () => {
-    // Wire this up to your actual auth/session teardown
-    // (e.g. clearing an auth context, invalidating a session token, etc.)
     setShowLogoutConfirm(false);
-    navigate("/app/login", { replace: true });
+    void signOut({ redirectUrl: "/app/login" });
   };
 
   return (

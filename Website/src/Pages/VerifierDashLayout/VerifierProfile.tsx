@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useClerk } from '@clerk/clerk-react'
 import {
   User, ShieldCheck, KeyRound, LogOut,
   Upload, Trash2, Save, RotateCcw,
@@ -128,7 +128,7 @@ function ConfirmModal({ modal, onCancel, onConfirm }: {
 
 /* ── Main page ── */
 export default function VerifierProfile() {
-  const navigate = useNavigate()
+  const { signOut } = useClerk()
 
   const [activeTab, setActiveTab]       = useState<TabId>('profile')
   const [profile, setProfile]           = useState<ProfileSettings>(PROFILE_DEFAULTS)
@@ -180,7 +180,7 @@ export default function VerifierProfile() {
       if (fileInputRef.current) fileInputRef.current.value = ''
       showToast('Profile reset.', 'info')
     } else if (kind === 'logout') {
-      navigate('/app/login')
+      void signOut({ redirectUrl: '/app/login' })
     }
     setModal(null)
   }

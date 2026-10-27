@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth, useClerk, useSignUp, useUser } from '@clerk/clerk-react'
 import {
   Eye, EyeOff, ArrowRight, ArrowLeft,
   Building2, GraduationCap, Search, Check,
   Lock, User, Mail, ChevronRight
 } from 'lucide-react'
 import Logo from '../assets/Logo2.webp'
+import { dashboardForRole, getCurrentUser, registerUser } from '../utils/authApi'
 
 /* ─── Types ─────────────────────────────────────────────── */
 type Role = 'issuer' | 'holder' | 'verifier'
@@ -247,16 +249,151 @@ function StepRole({ onNext }: { onNext: (role: Role) => void }) {
 }
 
 /* ─── Step 2: Account details ────────────────────────────── */
-function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void; onBack: () => void }) {
+function StepDetails({ role, onNext, onBack }: { role: Role; onNext: (isActive: boolean) => void; onBack: () => void }) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [verificationPending, setVerificationPending] = useState(false)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [institutionName, setInstitutionName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
+  const [error, setError] = useState('')
+  const [pendingRegistration, setPendingRegistration] = useState(false)
+  const [pendingInstitutionName, setPendingInstitutionName] = useState<string | undefined>()
+  const { signUp, isLoaded } = useSignUp()
+  const { getToken, isSignedIn } = useAuth()
+  const { isLoaded: isUserLoaded, user } = useUser()
+  const { setActive, signOut } = useClerk()
   const roleData = roles.find(r => r.id === role)!
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const displayFirstName = isSignedIn && !firstName ? user?.firstName ?? '' : firstName
+  const displayLastName = isSignedIn && !lastName ? user?.lastName ?? '' : lastName
+  const displayEmail = isSignedIn
+    ? user?.primaryEmailAddress?.emailAddress ?? email
+    : email
+
+  useEffect(() => {
+    if (!pendingRegistration || !isSignedIn || !isUserLoaded) return
+
+    let active = true
+    void (async () => {
+      try {
+        const token = await getToken()
+        if (!token) {
+          throw new Error('Unable to establish a secure session. Please sign in again.')
+        }
+
+        const profile = await registerUser(token, role, pendingInstitutionName)
+        if (!active) return
+        if (!profile.isActive) {
+          onNext(false)
+          await signOut()
+          return
+        }
+        onNext(true)
+      } catch (registrationError) {
+        if (active) {
+          setError(
+            registrationError instanceof Error
+              ? registrationError.message
+              : 'Unable to save your account profile. Please try again.',
+          )
+        }
+      } finally {
+        if (active) setPendingRegistration(false)
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [
+    getToken,
+    isSignedIn,
+    isUserLoaded,
+    onNext,
+    pendingInstitutionName,
+    pendingRegistration,
+    role,
+    signOut,
+  ])
+
+  const completeRegistration = async (
+    clerkSignupSession = signUp?.createdSessionId,
+  ) => {
+    if (clerkSignupSession) {
+      await setActive({ session: clerkSignupSession })
+    } else {
+      if (!isSignedIn || !isUserLoaded || !user) {
+        throw new Error('Your account session was not created. Please try again.')
+      }
+      await user.update({
+        firstName: displayFirstName,
+        lastName: displayLastName,
+      })
+    }
+
+    setPendingInstitutionName(role === 'issuer' ? institutionName : undefined)
+    setPendingRegistration(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+    if (!isLoaded || !signUp) {
+      setError('Authentication is still loading. Please try again.')
+      return
+    }
+
     setLoading(true)
-    // TODO: connect to real registration API
-    setTimeout(() => { setLoading(false); onNext() }, 1600)
+    try {
+      if (signUp.status === 'complete') {
+        await completeRegistration()
+        return
+      }
+
+      if (verificationPending) {
+        const result = await signUp.attemptEmailAddressVerification({
+          code: verificationCode,
+        })
+        if (result.status !== 'complete') {
+          setError('Email verification is not complete. Check the code and try again.')
+          return
+        }
+        await completeRegistration(result.createdSessionId)
+        return
+      }
+
+      if (isSignedIn) {
+        await completeRegistration()
+        return
+      }
+
+      const result = await signUp.create({
+        emailAddress: email,
+        password,
+        firstName,
+        lastName,
+      })
+
+      if (result.status === 'complete') {
+        await completeRegistration(result.createdSessionId)
+        return
+      }
+
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+      setVerificationPending(true)
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Unable to create your account. Please try again.',
+      )
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -298,6 +435,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {!verificationPending && (
+        <>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--navy)', opacity: 0.6 }}>
@@ -308,6 +447,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
               <input
                 type="text"
                 required
+                value={displayFirstName}
+                onChange={e => setFirstName(e.target.value)}
                 placeholder="First"
                 className="w-full pl-9 pr-4 py-3 rounded-2xl border text-sm outline-none transition-all"
                 style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)' }}
@@ -323,6 +464,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
             <input
               type="text"
               required
+              value={displayLastName}
+              onChange={e => setLastName(e.target.value)}
               placeholder="Last"
               className="w-full px-4 py-3 rounded-2xl border text-sm outline-none transition-all"
               style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)' }}
@@ -342,6 +485,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
               <input
                 type="text"
                 required
+                value={institutionName}
+                onChange={e => setInstitutionName(e.target.value)}
                 placeholder="ABC University"
                 className="w-full pl-9 pr-4 py-3 rounded-2xl border text-sm outline-none transition-all"
                 style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)' }}
@@ -352,6 +497,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
           </div>
         )}
 
+        {!isSignedIn && (
+        <>
         <div>
           <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--navy)', opacity: 0.6 }}>
             Email address
@@ -361,6 +508,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
             <input
               type="email"
               required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               placeholder={role === 'issuer' ? 'admin@institution.edu' : 'you@email.com'}
               className="w-full pl-9 pr-4 py-3 rounded-2xl border text-sm outline-none transition-all"
               style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)' }}
@@ -380,6 +529,8 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
               type={showPassword ? 'text' : 'password'}
               required
               minLength={8}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
               placeholder="Min. 8 characters"
               className="w-full pl-9 pr-12 py-3 rounded-2xl border text-sm outline-none transition-all"
               style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)' }}
@@ -397,24 +548,56 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
             </button>
           </div>
         </div>
+        </>
+        )}
+        </>
+        )}
 
-        <p className="text-xs" style={{ color: 'var(--navy)', opacity: 0.4 }}>
+        {verificationPending && (
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--navy)', opacity: 0.6 }}>
+              Email verification code
+            </label>
+            <input
+              type="text"
+              required
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              value={verificationCode}
+              onChange={e => setVerificationCode(e.target.value)}
+              placeholder="Enter the code sent to your email"
+              className="w-full px-4 py-3 rounded-2xl border text-sm outline-none transition-all"
+              style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)' }}
+            />
+            <p className="mt-2 text-xs" style={{ color: 'var(--navy)', opacity: 0.5 }}>
+              Check {displayEmail} for your verification code.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm" style={{ color: '#B91C1C' }}>
+            {error}
+          </div>
+        )}
+
+        {!verificationPending && <p className="text-xs" style={{ color: 'var(--navy)', opacity: 0.4 }}>
           By creating an account you agree to our{' '}
           <Link to="/terms" className="no-underline font-semibold" style={{ color: 'var(--blue)' }}>Terms</Link>
           {' '}and{' '}
           <Link to="/privacy" className="no-underline font-semibold" style={{ color: 'var(--blue)' }}>Privacy Policy</Link>.
-        </p>
+        </p>}
 
         <motion.button
           type="submit"
-          disabled={loading}
+          disabled={loading || pendingRegistration || !isLoaded}
           className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white mt-1 transition-all duration-200"
           style={{
-            background: loading ? 'var(--blue-4)' : 'var(--blue)',
+            background: loading || pendingRegistration || !isLoaded ? 'var(--blue-4)' : 'var(--blue)',
             boxShadow: loading ? 'none' : '0 4px 16px rgba(0,80,245,0.28)',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: loading || pendingRegistration || !isLoaded ? 'not-allowed' : 'pointer',
           }}
-          whileTap={{ scale: loading ? 1 : 0.98 }}
+          whileTap={{ scale: loading || pendingRegistration || !isLoaded ? 1 : 0.98 }}
         >
           <AnimatePresence mode="wait">
             {loading ? (
@@ -430,7 +613,7 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
                   animate={{ rotate: 360 }}
                   transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                 />
-                Creating account...
+                {pendingRegistration ? 'Saving account...' : verificationPending ? 'Verifying email...' : 'Creating account...'}
               </motion.div>
             ) : (
               <motion.div
@@ -440,7 +623,7 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                Create Account <ArrowRight size={15} />
+                {verificationPending ? 'Verify email' : 'Create Account'} <ArrowRight size={15} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -451,7 +634,7 @@ function StepDetails({ role, onNext, onBack }: { role: Role; onNext: () => void;
 }
 
 /* ─── Step 3: Success ────────────────────────────────────── */
-function StepSuccess({ role }: { role: Role }) {
+function StepSuccess({ role, pendingApproval }: { role: Role; pendingApproval: boolean }) {
   const roleData = roles.find(r => r.id === role)!
   return (
     <motion.div
@@ -490,18 +673,24 @@ function StepSuccess({ role }: { role: Role }) {
           <p className="text-xs" style={{ color: 'var(--navy)', opacity: 0.5 }}>{roleData.sub}</p>
         </div>
         <div className="ml-auto">
-          <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)' }}>
-            Active
+          <span
+            className="text-xs font-bold px-2 py-1 rounded-full"
+            style={{
+              background: pendingApproval ? 'rgba(245,158,11,0.12)' : 'rgba(22,163,74,0.12)',
+              color: pendingApproval ? '#B45309' : 'var(--success)',
+            }}
+          >
+            {pendingApproval ? 'Pending approval' : 'Active'}
           </span>
         </div>
       </div>
 
       <Link
-        to={`/app/${role}`}
+        to={pendingApproval ? '/app/login' : dashboardForRole(role)}
         className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white no-underline"
         style={{ background: 'var(--blue)', boxShadow: '0 4px 16px rgba(0,80,245,0.25)' }}
       >
-        Go to Dashboard <ChevronRight size={16} />
+        {pendingApproval ? 'Return to sign in' : 'Go to Dashboard'} <ChevronRight size={16} />
       </Link>
     </motion.div>
   )
@@ -527,6 +716,39 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 export default function SignupPage() {
   const [step, setStep] = useState(0)
   const [role, setRole] = useState<Role>('holder')
+  const [pendingApproval, setPendingApproval] = useState(false)
+  const [accountNotice, setAccountNotice] = useState('')
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+
+    let active = true
+    void (async () => {
+      try {
+        const token = await getToken()
+        if (!token) throw new Error('Unable to verify your signed-in account.')
+        const profile = await getCurrentUser(token)
+        if (active) {
+          navigate(dashboardForRole(profile.role), { replace: true })
+        }
+      } catch (error) {
+        if (!active) return
+        const message = error instanceof Error ? error.message : ''
+        if (message.includes('No active CertifyVault profile')) return
+        setAccountNotice(
+          message.includes('contact an administrator for activation')
+            ? 'Your account is inactive. Please contact an administrator for activation.'
+            : message || 'Unable to verify your account. Please try again.',
+        )
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [getToken, isLoaded, isSignedIn, navigate])
 
   return (
     <div className="flex min-h-screen" style={{ fontFamily: 'Figtree, system-ui, sans-serif' }}>
@@ -544,6 +766,15 @@ export default function SignupPage() {
         </Link>
 
         <div className="w-full max-w-md mx-auto">
+          {accountNotice && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
+              style={{ color: '#92400E' }}
+            >
+              {accountNotice}
+            </div>
+          )}
           {step < 2 && <ProgressBar step={step} total={2} />}
 
           <AnimatePresence mode="wait">
@@ -555,11 +786,14 @@ export default function SignupPage() {
             {step === 1 && (
               <StepDetails
                 role={role}
-                onNext={() => setStep(2)}
+                onNext={isActive => {
+                  setPendingApproval(!isActive)
+                  setStep(2)
+                }}
                 onBack={() => setStep(0)}
               />
             )}
-            {step === 2 && <StepSuccess role={role} />}
+            {step === 2 && <StepSuccess role={role} pendingApproval={pendingApproval} />}
           </AnimatePresence>
 
           {step < 2 && (

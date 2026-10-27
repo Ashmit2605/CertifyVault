@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useClerk, useSignIn } from '@clerk/clerk-react'
 import {
   ShieldCheck,
   Blocks,
@@ -133,16 +134,57 @@ function LeftPanel() {
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  const [step, setStep] = useState<'email' | 'code' | 'password' | 'done'>('email')
+  const [error, setError] = useState('')
+  const { signIn, isLoaded } = useSignIn()
+  const { setActive } = useClerk()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+    if (!isLoaded || !signIn) {
+      setError('Authentication is still loading. Please try again.')
+      return
+    }
+
     setLoading(true)
-    setTimeout(() => {
+    try {
+      if (step === 'email') {
+        await signIn.create({
+          strategy: 'reset_password_email_code',
+          identifier: email,
+        })
+        setStep('code')
+      } else if (step === 'code') {
+        const result = await signIn.attemptFirstFactor({
+          strategy: 'reset_password_email_code',
+          code: verificationCode,
+        })
+        if (result.status !== 'needs_new_password') {
+          throw new Error('The reset code could not be verified. Request a new code and try again.')
+        }
+        setStep('password')
+      } else if (step === 'password') {
+        const result = await signIn.resetPassword({
+          password: newPassword,
+        })
+        if (result.status === 'complete' && result.createdSessionId) {
+          await setActive({ session: result.createdSessionId })
+        }
+        setStep('done')
+      }
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Unable to reset your password. Please try again.',
+      )
+    } finally {
       setLoading(false)
-      setSubmitted(true)
-    }, 1800)
+    }
   }
 
   return (
@@ -173,13 +215,17 @@ export default function ForgotPasswordPage() {
             </div>
 
             <h1 className="font-extrabold text-3xl mb-2 text-center" style={{ color: 'var(--navy)' }}>
-              Forgot your password?
+              {step === 'done' ? 'Password updated' : 'Forgot your password?'}
             </h1>
             <p className="text-sm mb-8 text-center" style={{ color: 'var(--navy)', opacity: 0.5 }}>
-              Enter your account email and we’ll send a secure reset link.
+              {step === 'email' && 'Enter your account email and we’ll send a secure reset code.'}
+              {step === 'code' && `Enter the verification code sent to ${email}.`}
+              {step === 'password' && 'Choose a new password for your account.'}
+              {step === 'done' && 'Your password has been changed securely.'}
             </p>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {step !== 'done' && <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {step === 'email' && (
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--navy)', opacity: 0.6 }}>
                   Email address
@@ -202,17 +248,56 @@ export default function ForgotPasswordPage() {
                   }}
                 />
               </div>
+              )}
+
+              {step === 'code' && (
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--navy)', opacity: 0.6 }}>
+                    Verification code
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    value={verificationCode}
+                    onChange={e => setVerificationCode(e.target.value)}
+                    placeholder="Enter the code from your email"
+                    className="w-full px-4 py-3.5 rounded-2xl border text-sm outline-none transition-all"
+                    style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)', background: 'white' }}
+                  />
+                </div>
+              )}
+
+              {step === 'password' && (
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--navy)', opacity: 0.6 }}>
+                    New password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Min. 8 characters"
+                    className="w-full px-4 py-3.5 rounded-2xl border text-sm outline-none transition-all"
+                    style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)', background: 'white' }}
+                  />
+                </div>
+              )}
 
               <motion.button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !isLoaded}
                 className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white mt-2 transition-all duration-200"
                 style={{
-                  background: loading ? 'var(--blue-4)' : 'var(--blue)',
+                  background: loading || !isLoaded ? 'var(--blue-4)' : 'var(--blue)',
                   boxShadow: loading ? 'none' : '0 4px 16px rgba(0,80,245,0.28)',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: loading || !isLoaded ? 'not-allowed' : 'pointer',
                 }}
-                whileTap={{ scale: loading ? 1 : 0.98 }}
+                whileTap={{ scale: loading || !isLoaded ? 1 : 0.98 }}
               >
                 <AnimatePresence mode="wait">
                   {loading ? (
@@ -228,7 +313,7 @@ export default function ForgotPasswordPage() {
                         animate={{ rotate: 360 }}
                         transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                       />
-                      Sending reset link...
+                      {step === 'email' ? 'Sending reset code...' : step === 'code' ? 'Verifying code...' : 'Updating password...'}
                     </motion.div>
                   ) : (
                     <motion.div
@@ -238,25 +323,41 @@ export default function ForgotPasswordPage() {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                     >
-                      Send reset link
+                      {step === 'email' ? 'Send reset code' : step === 'code' ? 'Verify code' : 'Update password'}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </motion.button>
 
-              {submitted && (
+              {error && (
+                <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm" style={{ color: '#B91C1C' }}>
+                  {error}
+                </div>
+              )}
+
+              {step === 'code' && (
                 <div
                   className="rounded-2xl border px-4 py-3 text-sm"
                   style={{
-                    background: 'rgba(22,163,74,0.08)',
-                    borderColor: 'rgba(22,163,74,0.2)',
-                    color: '#166534',
+                    background: 'rgba(0,80,245,0.06)',
+                    borderColor: 'rgba(0,80,245,0.16)',
+                    color: 'var(--navy)',
                   }}
                 >
-                  A secure reset link has been sent to <strong>{email}</strong>.
+                  If an account exists for this address, a secure reset code has been sent.
                 </div>
               )}
-            </form>
+            </form>}
+
+            {step === 'done' && (
+              <Link
+                to="/app/login"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white no-underline"
+                style={{ background: 'var(--blue)' }}
+              >
+                Back to sign in
+              </Link>
+            )}
 
             <p className="text-center text-sm mt-6" style={{ color: 'var(--navy)', opacity: 0.5 }}>
               Need help?{' '}

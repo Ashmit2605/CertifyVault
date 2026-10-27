@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import PageLoader from "./Components/layout/PageLoader";
+import RequireAuth from "./Components/auth/RequireAuth";
 
 const Layout = lazy(() => import("./Components/layout/Layout"));
 const Home = lazy(() => import("./Pages/Home"));
@@ -15,6 +16,7 @@ const Contact = lazy(() => import("./Pages/Contact"));
 const LoginPage = lazy(() => import("./Pages/Login"));
 const SignupPage = lazy(() => import("./Pages/Signup"));
 const ForgotPasswordPage = lazy(() => import("./Pages/ForgotPassword"));
+const AuthCallbackPage = lazy(() => import("./Pages/AuthCallback"));
 const FraudDetection = lazy(() => import("./Pages/FraudDetection"));
 const PrivacyPolicyPage = lazy(() => import("./Pages/PrivacyPolicyPage"));
 const BlockchainPage = lazy(() => import("./Pages/Blockchain"));
@@ -137,6 +139,7 @@ export default function App() {
       <Route path="/app/login" element={<LoginPage />} />
       <Route path="/app/register" element={<SignupPage />} />
       <Route path="/app/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/app/auth-callback" element={<AuthCallbackPage />} />
 
       {/* ── Public marketing pages ── */}
       <Route element={<Layout />}>
@@ -159,7 +162,7 @@ export default function App() {
       {/* ──────────────── DASHBOARDS ──────────────── */}
 
       {/* ── Verifier Dashboard ── */}
-      <Route path="/verifierdashboard" element={<VerifierDashLayout />}>
+      <Route path="/verifierdashboard" element={<RequireAuth role="verifier"><VerifierDashLayout /></RequireAuth>}>
         <Route index element={<VerifierDashboard />} />
         <Route path="verify" element={<Verify />} />
         <Route path="history" element={<VerificationHistory />} />
@@ -169,7 +172,7 @@ export default function App() {
       </Route>
 
       {/* ── Holder Dashboard ── */}
-      <Route path="/holderdashboard" element={<HolderDashboardLayout />}>
+      <Route path="/holderdashboard" element={<RequireAuth role="holder"><HolderDashboardLayout /></RequireAuth>}>
         <Route index element={<HolderHome />} />
         <Route path="certificates" element={<MyCertificates />} />
         <Route path="verification" element={<HolderVerification />} />
@@ -182,9 +185,11 @@ export default function App() {
       <Route
         path="/issuerdashboard"
         element={
-          <TemplatesProvider>
-            <IssuerDashLayout />
-          </TemplatesProvider>
+          <RequireAuth role="issuer">
+            <TemplatesProvider>
+              <IssuerDashLayout />
+            </TemplatesProvider>
+          </RequireAuth>
         }
       >
         <Route index element={<Overview />} />
@@ -258,7 +263,7 @@ export default function App() {
       </Route>
 
       {/* ── Admin Dashboard ── */}
-      <Route path="/admindashboard" element={<AdminDashLayout />}>
+      <Route path="/admindashboard" element={<RequireAuth role="admin"><AdminDashLayout /></RequireAuth>}>
         <Route index element={<AdminOverview />} />
         <Route path="institutions" element={<AdminInstitutions />} />
         <Route path="users" element={<AdminUsers />} />

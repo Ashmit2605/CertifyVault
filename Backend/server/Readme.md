@@ -42,17 +42,19 @@ server/
 
 ## Environment Variables
 
-Create a `.env` file in the root of this folder with:
+Copy `.env.example` to `.env` in this folder and provide your local PostgreSQL connection string and Clerk **secret** key. Set the website's `VITE_CLERK_PUBLISHABLE_KEY` in `Website/.env.local`. Both Clerk keys must belong to the same Clerk application/environment. Set `FRONTEND_URL` to the exact website origin (scheme + host + port, no path); add more origins in `CLERK_AUTHORIZED_PARTIES` as a comma-separated list. Never put Clerk secret keys in the frontend.
 
 ```env
 PORT=5000
+CLERK_SECRET_KEY=sk_test_your_secret_key_here
+FRONTEND_URL=http://localhost:5173
+CLERK_AUTHORIZED_PARTIES=http://localhost:5173
 DATABASE_URL=postgresql://postgres:password@localhost:5432/certificate_db
-BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
-CONTRACT_ADDRESS=
-JWT_SECRET=your_secret
 ```
 
 > Do not commit `.env` to source control.
+
+The website also needs `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_API_URL=http://localhost:5000/api`.
 
 ## Installation
 
@@ -99,10 +101,21 @@ npm run db:push
 ## API Endpoints
 
 - `GET /api/health` — health check
-- `POST /api/auth/login` — authentication placeholder
-- `POST /api/certificates/issue` — issue a new certificate
+- `POST /api/auth/register` — create a profile for an authenticated Clerk account; accepts `role` (`issuer`, `holder`, or `verifier`) and requires `institutionName` for issuer accounts
+- `GET /api/auth/me` — return the authenticated user's active profile
+- `PATCH /api/auth/users/:clerkId/activation` — activate/deactivate an account (admin only); accepts `{ "isActive": boolean }`
+- `POST /api/certificates/issue` — issue a new certificate (requires an authenticated issuer or admin)
 - `GET /api/certificates/:certificateId` — get a certificate by ID
 - `POST /api/verification` — verify a certificate
+
+The frontend waits until Clerk reports an active session before requesting its session JWT and calling the API. It sends tokens using `Authorization: Bearer <token>`. The API validates them with `CLERK_SECRET_KEY` and the configured allowed frontend origins, obtains the user's canonical email and name from Clerk, and stores the Clerk user ID in the PostgreSQL `users` table. Passwords, email verification, OAuth, and reset codes stay with Clerk and are never stored by this API. A user's role is assigned only when their profile is first created and cannot be changed by later registration requests. New issuer accounts remain inactive until an administrator activates them; only active issuers can issue certificates. Admin accounts must be provisioned by a trusted operator and cannot be self-registered.
+
+After changing the Drizzle schema, generate and apply the database migration:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
 
 ## Notes
 
