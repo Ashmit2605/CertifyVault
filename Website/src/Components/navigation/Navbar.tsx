@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
-import Logo from '../../assets/Logo.png'
+import Logo from '../../assets/Logo.webp'
 
 const navLinks = [
   { label: 'Product', href: '/#features' },

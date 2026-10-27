@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LayoutGrid,
   Landmark,
@@ -10,14 +10,12 @@ import {
   Activity,
   ScrollText,
   Settings,
-  Search,
-  Bell,
   Menu,
   X,
   LogOut,
 } from "lucide-react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import logo2 from "../../assets/Logo3.png";
+import logo2 from "../../assets/Logo3.webp";
 
 /**
  * Design tokens — Vault / Platform Admin
@@ -143,76 +141,6 @@ function useViewport() {
     isMobile: width < 720,
     isTablet: width >= 720 && width < 1080,
   };
-}
-
-/* ---------------------------------------------------------------- */
-/*  Fit-to-height sizing for the icon rail — shrinks buttons/gaps    */
-/*  so all items always fit with no scrolling, no overlap.           */
-/*                                                                    */
-/*  NOTE: this hook measures the *nav* container's own clientHeight, */
-/*  which is a CSS-pixel measurement. Browser zoom (90% / 100% /     */
-/*  110%) scales layout viewport + element sizes together, so the    */
-/*  ratio between "space needed" and "space available" is preserved */
-/*  and the computed fit stays stable across zoom levels — it only   */
-/*  shrinks when there genuinely isn't enough vertical room (e.g. a  */
-/*  very short window), never as a side-effect of zooming.           */
-/* ---------------------------------------------------------------- */
-
-interface RailFit {
-  size: number;
-  gap: number;
-  icon: number;
-}
-
-function useFitRail(count: number) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [fit, setFit] = useState<RailFit>({ size: 52, gap: 10, icon: 19 });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || count <= 0) return;
-
-    const MAX_SIZE = 52;
-    const MAX_GAP = 10;
-    const MIN_SIZE = 30;
-    const MIN_GAP = 3;
-
-    const compute = () => {
-      const available = el.clientHeight;
-      const neededAtMax = count * MAX_SIZE + (count - 1) * MAX_GAP;
-
-      if (available <= 0) return;
-
-      if (neededAtMax <= available || count <= 1) {
-        setFit({ size: MAX_SIZE, gap: MAX_GAP, icon: 19 });
-        return;
-      }
-
-      const sizeRange = MAX_SIZE - MIN_SIZE;
-      const gapRange = MAX_GAP - MIN_GAP;
-      const denom = count * sizeRange + (count - 1) * gapRange;
-      const neededAtMin = count * MIN_SIZE + (count - 1) * MIN_GAP;
-      let t = denom > 0 ? (available - neededAtMin) / denom : 0;
-      t = Math.max(0, Math.min(1, t));
-
-      const size = MIN_SIZE + t * sizeRange;
-      const gap = MIN_GAP + t * gapRange;
-      const icon = Math.max(14, Math.round(size * 0.36));
-
-      setFit({ size, gap, icon });
-    };
-
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    window.addEventListener("resize", compute);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", compute);
-    };
-  }, [count]);
-
-  return { containerRef, ...fit };
 }
 
 /* ---------------------------------------------------------------- */
@@ -553,175 +481,75 @@ function MobileDrawer({ activeKey, onNavigate, isOpen, setIsOpen, onLogoutClick 
 }
 
 /* ---------------------------------------------------------------- */
-/*  Desktop Sidebar — light-theme circular icon rail                 */
+/*  Desktop dashboard navigation                                     */
 /* ---------------------------------------------------------------- */
 
 interface RailButtonProps {
   item: NavItem;
   active: boolean;
   onClick: () => void;
-  size: number;
-  iconSize: number;
 }
 
-interface TooltipPos {
-  x: number;
-  y: number;
-}
-
-function RailButton({ item, active, onClick, size, iconSize }: RailButtonProps) {
-  const [tooltipPos, setTooltipPos] = useState<TooltipPos | null>(null);
+function RailButton({ item, active, onClick }: RailButtonProps) {
   const Icon = item.icon;
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
       style={{
-        position: "relative",
-        display: "flex",
-        justifyContent: "center",
         flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 12px",
+        border: "none",
+        borderRadius: 10,
+        cursor: "pointer",
+        background: active ? COLORS.lightBlue : "transparent",
+        color: active ? COLORS.blue : COLORS.textDim,
+        fontFamily: "inherit",
+        fontSize: 13,
+        fontWeight: active ? 700 : 600,
+        whiteSpace: "nowrap",
       }}
-      onMouseEnter={(e) => {
-        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        setTooltipPos({ x: r.right + 12, y: r.top + r.height / 2 });
-      }}
-      onMouseLeave={() => setTooltipPos(null)}
     >
-      <button
-        onClick={onClick}
-        aria-label={item.label}
-        aria-current={active ? "page" : undefined}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: active ? COLORS.blue : COLORS.white,
-          color: active ? COLORS.white : COLORS.navy,
-          boxShadow: "0 2px 6px rgba(0,15,62,0.07)",
-          transition: "background .15s ease, transform .1s ease, box-shadow .15s ease, width .15s ease, height .15s ease",
-          position: "relative",
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={iconSize} strokeWidth={1.8} />
-      </button>
-
-      {/* tooltip — fixed so it escapes sidebar's overflow:hidden */}
-      {tooltipPos && (
-        <div
-          style={{
-            position: "fixed",
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            transform: "translateY(-50%)",
-            background: COLORS.navy,
-            color: COLORS.white,
-            fontFamily: "Figtree, sans-serif",
-            fontSize: 12.5,
-            fontWeight: 600,
-            padding: "7px 12px",
-            borderRadius: 9,
-            whiteSpace: "nowrap",
-            boxShadow: "0 10px 24px rgba(0,15,62,0.28)",
-            zIndex: 9999,
-            pointerEvents: "none",
-          }}
-        >
-          {item.label}
-        </div>
-      )}
-    </div>
+      <Icon size={16} strokeWidth={1.9} />
+      {item.label}
+    </button>
   );
 }
 
-/* Logout rail button — visually distinct (red) but sized to match the
-   nav rail's current fit so it never causes the rail above it to
-   look mismatched. It sits OUTSIDE the useFitRail-measured container,
-   so it has a fixed footprint and is never itself a candidate for
-   shrinking — it simply reserves its own space at the bottom of the
-   sidebar, which the fit calculation above it already accounts for
-   automatically (nav container is flex:1, so it only ever gets the
-   height that's left over once brand + divider + logout are laid out). */
 interface LogoutRailButtonProps {
   onClick: () => void;
-  size: number;
-  iconSize: number;
 }
 
-function LogoutRailButton({ onClick, size, iconSize }: LogoutRailButtonProps) {
-  const [tooltipPos, setTooltipPos] = useState<TooltipPos | null>(null);
-
+function LogoutRailButton({ onClick }: LogoutRailButtonProps) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Log out"
       style={{
-        position: "relative",
-        display: "flex",
-        justifyContent: "center",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "9px 12px",
+        border: `1px solid ${COLORS.line}`,
+        borderRadius: 10,
+        background: COLORS.white,
+        color: COLORS.red,
+        fontFamily: "inherit",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
         flexShrink: 0,
       }}
-      onMouseEnter={(e) => {
-        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        setTooltipPos({ x: r.right + 12, y: r.top + r.height / 2 });
-      }}
-      onMouseLeave={() => setTooltipPos(null)}
     >
-      <button
-        onClick={onClick}
-        aria-label="Log out"
-        style={{
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: COLORS.white,
-          color: COLORS.red,
-          boxShadow: "0 2px 6px rgba(0,15,62,0.07)",
-          transition: "background .15s ease, color .15s ease",
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = COLORS.redSoft;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = COLORS.white;
-        }}
-      >
-        <LogOut size={iconSize} strokeWidth={1.8} />
-      </button>
-
-      {tooltipPos && (
-        <div
-          style={{
-            position: "fixed",
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            transform: "translateY(-50%)",
-            background: COLORS.navy,
-            color: COLORS.white,
-            fontFamily: "Figtree, sans-serif",
-            fontSize: 12.5,
-            fontWeight: 600,
-            padding: "7px 12px",
-            borderRadius: 9,
-            whiteSpace: "nowrap",
-            boxShadow: "0 10px 24px rgba(0,15,62,0.28)",
-            zIndex: 9999,
-            pointerEvents: "none",
-          }}
-        >
-          Log out
-        </div>
-      )}
-    </div>
+      <LogOut size={16} strokeWidth={1.8} />
+      Log out
+    </button>
   );
 }
 
@@ -732,69 +560,52 @@ interface SidebarProps {
 }
 
 function Sidebar({ activeKey, onNavigate, onLogoutClick }: SidebarProps) {
-  const { containerRef, size, gap, icon } = useFitRail(NAV_ITEMS.length);
-
   return (
-    <aside
+    <header
       style={{
-        width: 96,
-        flexShrink: 0,
-        height: "100vh",
-        overflow: "hidden",
+        position: "sticky",
+        top: 0,
+        zIndex: 40,
+        width: "100%",
         background: COLORS.white,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "26px 0 20px",
-        borderRight: `1px solid ${COLORS.line}`,
-        gap: 0,
-        boxSizing: "border-box",
+        borderBottom: `1px solid ${COLORS.line}`,
       }}
     >
-      {/* brand mark */}
       <div
         style={{
-          width: 44,
-          height: 44,
+          maxWidth: 1440,
+          minHeight: 64,
+          margin: "0 auto",
+          padding: "10px 24px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          marginBottom: 20,
-          overflow: "hidden",
+          justifyContent: "space-between",
+          gap: 16,
         }}
       >
-        <img
-          src={logo2}
-          alt="Logo"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-          }}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <img src={logo2} alt="CertifyVault" style={{ width: 38, height: 38, objectFit: "contain" }} />
+          <div>
+            <div style={{ color: COLORS.navy, fontSize: 17, fontWeight: 800, lineHeight: 1.1 }}>
+              Certify<span style={{ color: COLORS.blue }}>Vault</span>
+            </div>
+            <div style={{ color: COLORS.textDim, fontSize: 11, fontWeight: 600, marginTop: 3 }}>
+              Platform Administrator
+            </div>
+          </div>
+        </div>
+        <LogoutRailButton onClick={onLogoutClick} />
       </div>
-
-      {/* divider */}
-      <div style={{ width: 28, height: 1, background: COLORS.line, marginBottom: 8, flexShrink: 0 }} />
-
-      {/* nav rail — sized to always fit the remaining height, no scrolling.
-          This container is flex:1 / minHeight:0, so it only ever receives
-          the space left over after the brand mark and the logout button
-          below have taken theirs — that's what keeps the whole sidebar
-          scroll-free and stable across browser zoom levels. */}
       <nav
-        ref={containerRef}
+        aria-label="Administrator navigation"
         style={{
+          maxWidth: 1440,
+          margin: "0 auto",
+          padding: "0 24px 8px",
           display: "flex",
-          flexDirection: "column",
-          gap,
-          flex: 1,
-          minHeight: 0,
-          width: "100%",
           alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
+          gap: 4,
+          overflowX: "auto",
         }}
       >
         {NAV_ITEMS.map((item) => (
@@ -803,20 +614,10 @@ function Sidebar({ activeKey, onNavigate, onLogoutClick }: SidebarProps) {
             item={item}
             active={activeKey === item.key}
             onClick={() => onNavigate(item)}
-            size={size}
-            iconSize={icon}
           />
         ))}
       </nav>
-
-      {/* divider above logout */}
-      <div style={{ width: 28, height: 1, background: COLORS.line, margin: "8px 0", flexShrink: 0 }} />
-
-      {/* logout — pinned to the bottom-left of the sidebar, fixed footprint */}
-      <div style={{ flexShrink: 0 }}>
-        <LogoutRailButton onClick={onLogoutClick} size={size} iconSize={icon} />
-      </div>
-    </aside>
+    </header>
   );
 }
 
@@ -847,7 +648,7 @@ export default function AdminDashLayout() {
     // Wire this up to your actual auth/session teardown
     // (e.g. clearing an auth context, invalidating a session token, etc.)
     setShowLogoutConfirm(false);
-    navigate("/login");
+    navigate("/app/login", { replace: true });
   };
 
   return (
@@ -855,16 +656,13 @@ export default function AdminDashLayout() {
       style={{
         fontFamily: "Figtree, sans-serif",
         display: "flex",
-        flexDirection: "row",
-        height: "100vh",
-        overflow: "hidden",
+        flexDirection: "column",
+        minHeight: "100vh",
         background: COLORS.mainBg,
         color: COLORS.navy,
       }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap');`}</style>
-
-      {/* Desktop Sidebar */}
+      {/* Desktop dashboard navigation */}
       {!isMobile && (
         <Sidebar
           activeKey={activeKey}
@@ -873,15 +671,57 @@ export default function AdminDashLayout() {
         />
       )}
 
-      {/* Mobile Drawer */}
+      {/* Mobile header and drawer */}
       {isMobile && (
-        <MobileDrawer
-          activeKey={activeKey}
-          onNavigate={handleNavigate}
-          isOpen={drawerOpen}
-          setIsOpen={setDrawerOpen}
-          onLogoutClick={() => setShowLogoutConfirm(true)}
-        />
+        <>
+          <header
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 40,
+              minHeight: 64,
+              padding: "10px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: COLORS.white,
+              borderBottom: `1px solid ${COLORS.line}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <img src={logo2} alt="CertifyVault" style={{ width: 36, height: 36, objectFit: "contain" }} />
+              <span style={{ color: COLORS.navy, fontSize: 16, fontWeight: 800 }}>
+                Certify<span style={{ color: COLORS.blue }}>Vault</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open administrator navigation"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+                height: 40,
+                border: `1px solid ${COLORS.line}`,
+                borderRadius: 10,
+                background: COLORS.white,
+                color: COLORS.navy,
+                cursor: "pointer",
+              }}
+            >
+              <Menu size={20} />
+            </button>
+          </header>
+          <MobileDrawer
+            activeKey={activeKey}
+            onNavigate={handleNavigate}
+            isOpen={drawerOpen}
+            setIsOpen={setDrawerOpen}
+            onLogoutClick={() => setShowLogoutConfirm(true)}
+          />
+        </>
       )}
 
       {/* Logout confirmation modal — shared by desktop rail + mobile drawer */}
@@ -893,59 +733,15 @@ export default function AdminDashLayout() {
 
       <main
         style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: isMobile ? "8px 16px 20px" : "16px 40px 50px",
+          width: "100%",
+          maxWidth: 1440,
+          margin: "0 auto",
+          padding: isMobile ? "20px 16px 32px" : "28px 40px 50px",
           background: COLORS.mainBg,
-          position: "relative",
+          flex: 1,
+          minWidth: 0,
         }}
       >
-        {/* topbar */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
-            justifyContent: "space-between",
-            marginBottom: 0,
-            gap: isMobile ? 16 : 24,
-            position: "relative",
-          }}
-        >
-          {/* Mobile Hamburger Button */}
-          {isMobile && (
-            <button
-              onClick={() => setDrawerOpen(true)}
-              style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                width: 42,
-                height: 42,
-                borderRadius: 14,
-                background: COLORS.white,
-                border: `1px solid ${COLORS.line}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: COLORS.navy,
-                transition: "background 0.15s ease, box-shadow 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = COLORS.lightBlue;
-                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,15,62,0.1)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = COLORS.white;
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <Menu size={20} />
-            </button>
-          )}
-        </div>
-
         {/* Page content — each sidebar item's own page renders here via its route */}
         <Outlet />
       </main>

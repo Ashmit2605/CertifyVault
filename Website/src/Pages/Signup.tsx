@@ -6,7 +6,7 @@ import {
   Building2, GraduationCap, Search, Check,
   Lock, User, Mail, ChevronRight
 } from 'lucide-react'
-import Logo from '../assets/Logo2.png'
+import Logo from '../assets/Logo2.webp'
 
 /* ─── Types ─────────────────────────────────────────────── */
 type Role = 'issuer' | 'holder' | 'verifier'

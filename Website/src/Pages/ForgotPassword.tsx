@@ -9,7 +9,7 @@ import {
   MailCheck,
   ArrowLeft,
 } from 'lucide-react'
-import Logo from '../assets/Logo2.png'
+import Logo from '../assets/Logo2.webp'
 
 const trustSignals = [
   { icon: ShieldCheck, label: 'SHA-256 Verified', color: '#16A34A', delay: 0 },

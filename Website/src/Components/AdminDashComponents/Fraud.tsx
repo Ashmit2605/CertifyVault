@@ -1,4 +1,5 @@
-import { BellRing, Eye, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Eye, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useState } from "react";
 
 const alerts = [
   { type: "Suspicious certificate match", level: "High", institution: "MIT Pune", description: "Duplicate transcript signatures detected across 4 records.", time: "12 min ago" },
@@ -21,6 +22,15 @@ const statusTone: Record<string, string> = {
 };
 
 export default function AdminFraud() {
+  const [caseStatuses, setCaseStatuses] = useState<Record<string, "Open" | "Investigating" | "Resolved">>({});
+
+  const advanceCase = (alertType: string) => {
+    setCaseStatuses((current) => ({
+      ...current,
+      [alertType]: current[alertType] === "Open" ? "Investigating" : "Resolved",
+    }));
+  };
+
   return (
     <div className="space-y-6" style={{ fontFamily: "'Figtree', sans-serif" }}>
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
@@ -72,6 +82,23 @@ export default function AdminFraud() {
                 <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                   <span>{alert.institution}</span>
                   <span>{alert.time}</span>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
+                  <span className="text-xs font-medium text-slate-600">
+                    Case: {caseStatuses[alert.type] ?? "Open"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={caseStatuses[alert.type] === "Resolved"}
+                    onClick={() => advanceCase(alert.type)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {caseStatuses[alert.type] === "Open"
+                      ? "Start investigation"
+                      : caseStatuses[alert.type] === "Investigating"
+                        ? "Mark resolved"
+                        : "Resolved"}
+                  </button>
                 </div>
               </div>
             ))}

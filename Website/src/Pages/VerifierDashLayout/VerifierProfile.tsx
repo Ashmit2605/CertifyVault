@@ -191,8 +191,8 @@ export default function VerifierProfile() {
   ]
 
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-6">
+    <div className="min-h-screen" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
         {/* Header card */}
         <div className="rounded-3xl border bg-white p-6" style={{ borderColor: 'var(--bg-4)', boxShadow: '0 1px 4px rgba(0,15,62,0.05)' }}>

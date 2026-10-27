@@ -19,7 +19,6 @@ import {
   MapPin,
   Mail,
   Phone,
-  Globe,
   UserCog,
   AlertTriangle,
   Filter,

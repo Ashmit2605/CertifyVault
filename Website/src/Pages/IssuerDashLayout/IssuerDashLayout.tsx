@@ -78,9 +78,8 @@ export function TopNav() {
 
   const handleLogout = () => setShowLogoutModal(true);
   const confirmLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = "/";
+    setShowLogoutModal(false);
+    navigate("/app/login", { replace: true });
   };
   const cancelLogout = () => setShowLogoutModal(false);
 

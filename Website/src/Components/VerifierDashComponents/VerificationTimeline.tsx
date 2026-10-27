@@ -12,7 +12,7 @@ export default function VerificationTimeline({ steps, currentStep }: Props) {
       {steps.map((step, i) => {
         const done    = i < currentStep
         const active  = i === currentStep
-        const pending = i > currentStep
+        // const pending = i > currentStep
 
         return (
           <div key={step.id} className="flex items-start gap-3">

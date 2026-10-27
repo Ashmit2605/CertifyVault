@@ -1,93 +1,102 @@
-import { Routes, Route } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import PageLoader from "./Components/layout/PageLoader";
 
-import Layout from "./Components/layout/Layout";
-import Home from "./Pages/Home";
-import HowItWorks from "./Pages/HowItWorks";
-import Issuers from "./Pages/Issuers";
-import Holders from "./Pages/Holders";
-import Verifiers from "./Pages/Verifiers";
-import Security from "./Pages/Security";
-import Verify from "./Pages/Verify";
-import About from "./Pages/About";
-import Contact from "./Pages/Contact";
-import LoginPage from "./Pages/Login";
-import SignupPage from "./Pages/Signup";
-import ForgotPasswordPage from "./Pages/ForgotPassword";
-import FraudDetection from "./Pages/FraudDetection";
-import PrivacyPolicyPage from "./Pages/PrivacyPolicyPage";
-import BlockchainPage from "./Pages/Blockchain";
-import Documentation from "./Pages/Documentation";
-import Privacy from "./Pages/Privacy";
+const Layout = lazy(() => import("./Components/layout/Layout"));
+const Home = lazy(() => import("./Pages/Home"));
+const HowItWorks = lazy(() => import("./Pages/HowItWorks"));
+const Issuers = lazy(() => import("./Pages/Issuers"));
+const Holders = lazy(() => import("./Pages/Holders"));
+const Verifiers = lazy(() => import("./Pages/Verifiers"));
+const Security = lazy(() => import("./Pages/Security"));
+const Verify = lazy(() => import("./Pages/Verify"));
+const About = lazy(() => import("./Pages/About"));
+const Contact = lazy(() => import("./Pages/Contact"));
+const LoginPage = lazy(() => import("./Pages/Login"));
+const SignupPage = lazy(() => import("./Pages/Signup"));
+const ForgotPasswordPage = lazy(() => import("./Pages/ForgotPassword"));
+const FraudDetection = lazy(() => import("./Pages/FraudDetection"));
+const PrivacyPolicyPage = lazy(() => import("./Pages/PrivacyPolicyPage"));
+const BlockchainPage = lazy(() => import("./Pages/Blockchain"));
+const Documentation = lazy(() => import("./Pages/Documentation"));
+const Privacy = lazy(() => import("./Pages/Privacy"));
 
 // Verifier dashboard
-import VerifierDashLayout from "./Pages/VerifierDashLayout/VerifierDashLayout";
-import VerifierDashboard from "./Pages/VerifierDashLayout/VerifierDashboard";
-import VerificationHistory from "./Pages/VerifierDashLayout/VerificationHistory";
-import SavedVerifications from "./Pages/VerifierDashLayout/SavedVerifications";
-import VerificationReports from "./Pages/VerifierDashLayout/VerificationReports";
-import VerifierProfile from "./Pages/VerifierDashLayout/VerifierProfile";
+const VerifierDashLayout = lazy(() => import("./Pages/VerifierDashLayout/VerifierDashLayout"));
+const VerifierDashboard = lazy(() => import("./Pages/VerifierDashLayout/VerifierDashboard"));
+const VerificationHistory = lazy(() => import("./Pages/VerifierDashLayout/VerificationHistory"));
+const SavedVerifications = lazy(() => import("./Pages/VerifierDashLayout/SavedVerifications"));
+const VerificationReports = lazy(() => import("./Pages/VerifierDashLayout/VerificationReports"));
+const VerifierProfile = lazy(() => import("./Pages/VerifierDashLayout/VerifierProfile"));
 
-// ==================== ISSUER DASHBOARD ====================
-import IssuerDashLayout from "./Pages/IssuerDashLayout/IssuerDashLayout";
+// Issuer dashboard
+const IssuerDashLayout = lazy(() => import("./Pages/IssuerDashLayout/IssuerDashLayout"));
+const Overview = lazy(() => import("./Components/IssuerDashComponents/Dashboard/Overview"));
+const Certificates = lazy(() => import("./Components/IssuerDashComponents/Certificates/Certificates"));
+const IssueCertificate = lazy(() => import("./Components/IssuerDashComponents/Certificates/IssueCertificate/IssueCertificate"));
+const TemplatesProvider = lazy(async () => {
+  const module = await import("./Components/IssuerDashComponents/Certificates/Templates/Templates");
+  return { default: module.TemplatesProvider };
+});
+const Templates = lazy(() => import("./Components/IssuerDashComponents/Certificates/Templates/Templates"));
+const TemplateEditor = lazy(async () => {
+  const module = await import("./Components/IssuerDashComponents/Certificates/Templates/Templates");
+  return { default: module.TemplateEditor };
+});
+const Verification = lazy(() => import("./Components/IssuerDashComponents/Verifications/verification"));
+const RevocationsProvider = lazy(async () => {
+  const module = await import("./Components/IssuerDashComponents/Verifications/revocations");
+  return { default: module.RevocationsProvider };
+});
+const Revocations = lazy(() => import("./Components/IssuerDashComponents/Verifications/revocations"));
+const RevokeCertificate = lazy(async () => {
+  const module = await import("./Components/IssuerDashComponents/Verifications/revocations");
+  return { default: module.RevokeCertificate };
+});
+const FraudAlerts = lazy(() => import("./Components/IssuerDashComponents/Verifications/fraud&alerts"));
+const Analytics = lazy(() => import("./Components/IssuerDashComponents/Analytics/analytics"));
+const AuditLogs = lazy(() => import("./Components/IssuerDashComponents/AuditLogs/auditlogs"));
+const StudentsProvider = lazy(async () => {
+  const module = await import("./Components/IssuerDashComponents/Students/students");
+  return { default: module.StudentsProvider };
+});
+const Students = lazy(() => import("./Components/IssuerDashComponents/Students/students"));
+const StudentCertificateHistory = lazy(async () => {
+  const module = await import("./Components/IssuerDashComponents/Students/students");
+  return { default: module.StudentCertificateHistory };
+});
+const SettingsSidebar = lazy(() => import("./Components/IssuerDashComponents/Settings/settingssidebar"));
+const Profile = lazy(() => import("./Components/IssuerDashComponents/Settings/profile"));
+const Institution = lazy(() => import("./Components/IssuerDashComponents/Settings/institution"));
+const UsersPermissions = lazy(() => import("./Components/IssuerDashComponents/Settings/userspermissions"));
+const Notifications = lazy(() => import("./Components/IssuerDashComponents/Settings/notifications"));
+const IssuerSecurity = lazy(() => import("./Components/IssuerDashComponents/Settings/security"));
+const Branding = lazy(() => import("./Components/IssuerDashComponents/Settings/branding"));
 
-import Overview from "./Components/IssuerDashComponents/Dashboard/Overview";
-import Certificates from "./Components/IssuerDashComponents/Certificates/Certificates";
-import IssueCertificate from "./Components/IssuerDashComponents/Certificates/IssueCertificate/IssueCertificate";
-import {
-  TemplatesProvider,
-  default as Templates,
-  TemplateEditor,
-} from "./Components/IssuerDashComponents/Certificates/Templates/Templates";
+// Holder dashboard
+const HolderDashboardLayout = lazy(async () => {
+  const module = await import("./Pages/HolderDashLayout/HolderDashLayout");
+  return { default: module.HolderDashboardLayout };
+});
+const HolderHome = lazy(() => import("./Components/HolderDashComponents/home"));
+const MyCertificates = lazy(() => import("./Components/HolderDashComponents/Mycertificates"));
+const HolderVerification = lazy(() => import("./Components/HolderDashComponents/Verification"));
+const Share = lazy(() => import("./Components/HolderDashComponents/share"));
+const Activity = lazy(() => import("./Components/HolderDashComponents/Activity"));
+const HolderProfile = lazy(() => import("./Components/HolderDashComponents/Profile"));
 
-import Verification from "./Components/IssuerDashComponents/Verifications/verification";
-import {
-  default as Revocations,
-  RevocationsProvider,
-  RevokeCertificate,
-} from "./Components/IssuerDashComponents/Verifications/revocations";
-
-import FraudAlerts from "./Components/IssuerDashComponents/Verifications/fraud&alerts";
-import Analytics from "./Components/IssuerDashComponents/Analytics/analytics";
-import AuditLogs from "./Components/IssuerDashComponents/AuditLogs/auditlogs";
-
-import {
-  default as Students,
-  StudentsProvider,
-  StudentCertificateHistory,
-} from "./Components/IssuerDashComponents/Students/students";
-
-import SettingsSidebar from "./Components/IssuerDashComponents/Settings/settingssidebar";
-import Profile from "./Components/IssuerDashComponents/Settings/profile";
-import Institution from "./Components/IssuerDashComponents/Settings/institution";
-import UsersPermissions from "./Components/IssuerDashComponents/Settings/userspermissions";
-import Notifications from "./Components/IssuerDashComponents/Settings/notifications";
-import IssuerSecurity from "./Components/IssuerDashComponents/Settings/security";
-import Branding from "./Components/IssuerDashComponents/Settings/branding";
-
-// ==================== HOLDER DASHBOARD ====================
-import { HolderDashboardLayout } from "./Pages/HolderDashLayout/HolderDashLayout";
-
-import HolderHome from "./Components/HolderDashComponents/home";
-import MyCertificates from "./Components/HolderDashComponents/Mycertificates";
-import HolderVerification from "./Components/HolderDashComponents/Verification";
-import Share from "./Components/HolderDashComponents/share";
-import Activity from "./Components/HolderDashComponents/Activity";
-import HolderProfile from "./Components/HolderDashComponents/Profile";
-
-// ==================== ADMIN DASHBOARD ====================
-import AdminDashLayout from "./Pages/AdminDashLayout/AdminDashLayout";
-
-// TODO: Create these admin component files in ./Components/AdminDashComponents/
-import AdminOverview from "./Components/AdminDashComponents/Overview";
-import AdminInstitutions from "./Components/AdminDashComponents/Institutions";
-import AdminUsers from "./Components/AdminDashComponents/Users";
-import AdminIssuers from "./Components/AdminDashComponents/Issuers";
-import AdminVerification from "./Components/AdminDashComponents/Verification";
-import AdminFraud from "./Components/AdminDashComponents/Fraud";
-import AdminBlockchain from "./Components/AdminDashComponents/Blockchain";
-import AdminHealth from "./Components/AdminDashComponents/Health";
-import AdminAudit from "./Components/AdminDashComponents/Audit";
-import AdminSettings from "./Components/AdminDashComponents/Settings";
+// Administrator dashboard
+const AdminDashLayout = lazy(() => import("./Pages/AdminDashLayout/AdminDashLayout"));
+const AdminOverview = lazy(() => import("./Components/AdminDashComponents/Overview"));
+const AdminInstitutions = lazy(() => import("./Components/AdminDashComponents/Institutions"));
+const AdminUsers = lazy(() => import("./Components/AdminDashComponents/Users"));
+const AdminIssuers = lazy(() => import("./Components/AdminDashComponents/Issuers"));
+const AdminVerification = lazy(() => import("./Components/AdminDashComponents/Verification"));
+const AdminFraud = lazy(() => import("./Components/AdminDashComponents/Fraud"));
+const AdminBlockchain = lazy(() => import("./Components/AdminDashComponents/Blockchain"));
+const AdminHealth = lazy(() => import("./Components/AdminDashComponents/Health"));
+const AdminAudit = lazy(() => import("./Components/AdminDashComponents/Audit"));
+const AdminSettings = lazy(() => import("./Components/AdminDashComponents/Settings"));
 
 
 function ComingSoon({ label }: { label: string }) {
@@ -122,6 +131,7 @@ function ComingSoon({ label }: { label: string }) {
 
 export default function App() {
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       {/* ── Auth pages (no navbar/footer) ── */}
       <Route path="/app/login" element={<LoginPage />} />
@@ -146,7 +156,7 @@ export default function App() {
         <Route path="/product-privacy" element={<Privacy />} />
       </Route>
 
-      {/* ──────────────── DASHBOARDS (WITH /app PREFIX) ──────────────── */}
+      {/* ──────────────── DASHBOARDS ──────────────── */}
 
       {/* ── Verifier Dashboard ── */}
       <Route path="/verifierdashboard" element={<VerifierDashLayout />}>
@@ -237,6 +247,7 @@ export default function App() {
 
         {/* Settings */}
         <Route path="settings" element={<SettingsSidebar />}>
+          <Route index element={<Navigate to="profile" replace />} />
           <Route path="profile" element={<Profile />} />
           <Route path="institution" element={<Institution />} />
           <Route path="users-permissions" element={<UsersPermissions />} />
@@ -263,5 +274,6 @@ export default function App() {
       {/* ── 404 Fallback (Must be last) ── */}
       <Route path="*" element={<ComingSoon label="Page Not Found" />} />
     </Routes>
+    </Suspense>
   );
 }

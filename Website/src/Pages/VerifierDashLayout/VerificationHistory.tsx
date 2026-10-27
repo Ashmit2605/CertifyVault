@@ -32,8 +32,8 @@ export default function VerificationHistory() {
     : MOCK_HISTORY.filter(h => h.status === activeFilter)
 
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--bg-2)' }}>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-screen" style={{ background: 'var(--bg-2)' }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
         <motion.div
           className="mb-8"

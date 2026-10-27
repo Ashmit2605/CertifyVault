@@ -9,7 +9,6 @@ import {
   Plus,
   Search,
   ShieldCheck,
-  TrendingUp,
   UserCog,
   X,
 } from "lucide-react";

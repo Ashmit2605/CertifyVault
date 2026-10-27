@@ -5,7 +5,7 @@ import {
   Eye, EyeOff, ShieldCheck,
   Blocks, QrCode, BadgeCheck, Lock,
 } from 'lucide-react'
-import Logo from '../assets/Logo2.png'
+import Logo from '../assets/Logo2.webp'
 
 
 

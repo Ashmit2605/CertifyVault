@@ -62,8 +62,8 @@ export default function VerifierDashboard() {
   }
 
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-screen" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
         {/* ── Hero greeting ── */}
         <motion.div

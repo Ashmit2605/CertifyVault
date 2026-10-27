@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Bell, ChevronDown, Menu, X, LayoutDashboard, ScanLine, History, Bookmark, FileText } from 'lucide-react'
-import Logo from '../../assets/Logo.png'
+import Logo from '../../assets/Logo.webp'
 
 const navItems = [
   { label: 'Dashboard', href: '/verifierdashboard', icon: LayoutDashboard },
@@ -13,17 +13,8 @@ const navItems = [
 ]
 
 export default function VerifierNavbar() {
-  const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 16)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  useEffect(() => setMobileOpen(false), [location.pathname])
 
   const isActive = (href: string) =>
     href === '/verifierdashboard'
@@ -33,22 +24,14 @@ export default function VerifierNavbar() {
   return (
     <>
       <motion.header
-        className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-3"
-        initial={{ y: -72, opacity: 0 }}
+        className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur"
+        initial={{ opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.25 }}
       >
         <nav
-          className="w-full max-w-7xl flex items-center justify-between px-4 transition-all duration-300"
-          style={{
-            background: scrolled ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.82)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '9999px',
-            border: scrolled ? '1px solid rgba(0,15,62,0.10)' : '1px solid rgba(0,15,62,0.06)',
-            boxShadow: scrolled ? '0 4px 20px rgba(0,15,62,0.08)' : 'none',
-            height: scrolled ? '52px' : '60px',
-          }}
+          aria-label="Verifier dashboard navigation"
+          className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 lg:px-6"
         >
           {/* Logo */}
           <Link to="/verifierdashboard" className="flex items-center gap-2 no-underline shrink-0">
@@ -60,68 +43,65 @@ export default function VerifierNavbar() {
           </Link>
 
           {/* Center nav */}
-          <div className="hidden md:flex items-center gap-0.5 p-1 rounded-full" style={{ background: 'var(--bg-3)' }}>
+          <div className="hidden flex-1 items-center justify-center gap-1 lg:flex">
             {navItems.map(item => (
               <Link
                 key={item.label}
                 to={item.href}
-                className="relative px-4 py-1.5 rounded-full text-sm font-medium no-underline transition-colors duration-150"
-                style={{ color: isActive(item.href) ? 'var(--navy)' : 'var(--navy)', opacity: isActive(item.href) ? 1 : 0.5 }}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+                className={`group relative flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-all duration-150 ${
+                  isActive(item.href)
+                    ? 'text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
               >
-                {isActive(item.href) && (
-                  <motion.div
-                    layoutId="nav-pill"
-                    className="absolute inset-0 rounded-full"
-                    style={{ background: 'white', boxShadow: '0 1px 6px rgba(0,15,62,0.08)' }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10">{item.label}</span>
+                <item.icon
+                  size={17}
+                  className={isActive(item.href) ? 'text-blue-600' : 'text-gray-500'}
+                />
+                <span className="whitespace-nowrap">{item.label}</span>
               </Link>
             ))}
           </div>
 
           {/* Right actions */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden shrink-0 items-center gap-2 lg:flex">
             <button
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-              style={{ color: 'var(--navy)', opacity: 0.5 }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'var(--bg-3)' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.background = 'transparent' }}
+              className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm text-gray-500 transition-colors hover:bg-gray-50"
               aria-label="Search"
             >
               <Search size={16} />
+              <span className="hidden xl:inline">Search verifications...</span>
             </button>
             <button
-              className="w-8 h-8 rounded-full flex items-center justify-center relative transition-colors"
-              style={{ color: 'var(--navy)', opacity: 0.5 }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'var(--bg-3)' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.background = 'transparent' }}
+              className="relative rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
               aria-label="Notifications"
             >
               <Bell size={16} />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--blue)' }} />
+              <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-red-500" />
             </button>
             <Link
               to="/verifierdashboard/profile"
               aria-label="Open verifier profile settings"
-              className="flex items-center gap-2 pl-2 border-l no-underline transition-opacity hover:opacity-80"
-              style={{ borderColor: 'var(--bg-5)' }}
+              className="flex items-center gap-2 rounded-lg py-1 pl-2 pr-1 no-underline transition-colors hover:bg-gray-50"
             >
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'var(--navy)' }}>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
                 V
               </div>
-              <span className="text-sm font-semibold" style={{ color: 'var(--navy)' }}>Verifier</span>
-              <ChevronDown size={13} style={{ color: 'var(--navy)', opacity: 0.4 }} />
+              <span className="text-left">
+                <span className="block text-sm font-medium leading-tight text-gray-900">Verifier</span>
+                <span className="block text-xs leading-tight text-gray-500">Organization</span>
+              </span>
+              <ChevronDown size={14} className="text-gray-400" />
             </Link>
           </div>
 
           {/* Mobile toggle */}
           <button
-            className="md:hidden p-2 rounded-full"
-            style={{ color: 'var(--navy)' }}
+            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
             onClick={() => setMobileOpen(v => !v)}
-            aria-label="Toggle menu"
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
           >
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -132,11 +112,10 @@ export default function VerifierNavbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            className="fixed inset-0 z-40 flex flex-col pt-20 px-5 pb-8"
-            style={{ background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)' }}
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            className="absolute left-0 right-0 top-full z-40 flex max-h-[calc(100vh-4rem)] flex-col overflow-y-auto border-b border-gray-200 bg-white px-4 py-2 shadow-lg lg:hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
           >
             <div className="flex flex-col gap-1">
@@ -149,13 +128,17 @@ export default function VerifierNavbar() {
                 >
                   <Link
                     to={item.href}
-                    className="flex items-center gap-3 px-4 py-3 rounded-2xl no-underline transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-3 no-underline transition-colors ${
+                      isActive(item.href)
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
                     style={{
-                      background: isActive(item.href) ? 'var(--light-blue)' : 'transparent',
-                      color: 'var(--navy)',
+                      color: isActive(item.href) ? 'var(--blue)' : 'var(--navy)',
                     }}
                   >
-                    <item.icon size={18} strokeWidth={2} style={{ color: isActive(item.href) ? 'var(--blue)' : 'var(--navy)', opacity: isActive(item.href) ? 1 : 0.5 }} />
+                    <item.icon size={18} strokeWidth={2} />
                     <span className="font-semibold">{item.label}</span>
                   </Link>
                 </motion.div>
