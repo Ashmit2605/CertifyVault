@@ -51,7 +51,7 @@ export default function VerifierNavbar() {
           }}
         >
           {/* Logo */}
-          <Link to="/app/verifier" className="flex items-center gap-2 no-underline shrink-0">
+          <Link to="/verifierdashboard" className="flex items-center gap-2 no-underline shrink-0">
             <img src={Logo} alt="CertifyVault logo" className="h-8 w-auto" />
             <div className="hidden sm:block">
               <p className="text-sm font-bold leading-none" style={{ color: 'var(--navy)' }}>CertifyVault</p>

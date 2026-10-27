@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  Download,
   FileCheck2,
   ShieldCheck,
   TrendingUp,
@@ -31,6 +32,34 @@ const institutionPulse = [
   { name: "VIT Pune", value: 71 },
 ];
 
+function downloadPlatformReport() {
+  const rows = [
+    ["Section", "Metric", "Value"],
+    ...overviewStats.map(({ title, value }) => ["Platform", title, value]),
+    ...[
+      ["Ledger uptime", "99.98%"],
+      ["API response", "214ms"],
+      ["Verification jobs", "98.7%"],
+      ["Auth success", "99.92%"],
+    ].map(([label, value]) => ["Operational health", label, value]),
+    ...institutionPulse.map(({ name, value }) => ["Institution engagement", name, `${value}%`]),
+    ...recentAlerts.map(({ title, detail, tag }) => ["Priority alert", title, `${tag}: ${detail}`]),
+  ];
+  const csv = rows
+    .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","))
+    .join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = "certifyvault-platform-report.csv";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 export default function AdminOverview() {
   return (
     <div className="space-y-6" style={{ fontFamily: "'Figtree', sans-serif" }}>
@@ -41,9 +70,19 @@ export default function AdminOverview() {
             <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Platform performance</h2>
             <p className="mt-2 text-sm text-slate-600">Real-time platform metrics, trends, and alerts at a glance.</p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-            <TrendingUp className="h-4 w-4" />
-            +18.4% vs last month
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+              <TrendingUp className="h-4 w-4" />
+              +18.4% vs last month
+            </div>
+            <button
+              type="button"
+              onClick={downloadPlatformReport}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Download className="h-4 w-4" />
+              Export report
+            </button>
           </div>
         </div>
       </div>

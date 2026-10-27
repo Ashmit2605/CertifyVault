@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 
-type UserRole = "Issuer" | "Student" | "Verifier" | "Holder";
+type UserRole = "Admin" | "Issuer" | "Student" | "Verifier" | "Holder";
 
 type UserStatus = "Active" | "Pending";
 
@@ -43,7 +43,7 @@ type User = {
 
 type ModalType = "view" | "edit" | "delete" | null;
 
-const roleOptions: UserRole[] = ["Issuer", "Student", "Verifier", "Holder"];
+const roleOptions: UserRole[] = ["Admin", "Issuer", "Student", "Verifier", "Holder"];
 
 const statusOptions: UserStatus[] = ["Active", "Pending"];
 
@@ -84,7 +84,7 @@ const initialUsers: User[] = [
     email: "admin@verichain.ai",
     phone: "+1 415 555 0113",
     userId: "USR-1188",
-    role: "Holder",
+    role: "Admin",
     institution: "Platform",
     department: "Operations",
     lastLogin: "15 minutes ago",
@@ -246,7 +246,7 @@ export default function AdminUsers() {
       },
       {
         title: "Administrators",
-        value: users.filter((user) => ["Issuer", "Holder"].includes(user.role)).length.toLocaleString(),
+        value: users.filter((user) => user.role === "Admin").length.toLocaleString(),
         icon: ShieldCheck,
         accent: "bg-violet-100 text-violet-700",
       },

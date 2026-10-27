@@ -18,8 +18,26 @@ const methods = [
 export default function VerificationInput({ onVerify, loading }: Props) {
   const [method, setMethod] = useState<Method>('upload')
   const [certId, setCertId] = useState('')
+  const [qrToken, setQrToken] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [inputError, setInputError] = useState('')
+  const [fileName, setFileName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const verifyFile = (file?: File) => {
+    if (!file) return
+
+    const supportedTypes = ['application/pdf', 'image/png', 'image/jpeg']
+    const supportedExtension = /\.(pdf|png|jpe?g)$/i.test(file.name)
+    if ((!supportedTypes.includes(file.type) && !supportedExtension) || file.size > 10 * 1024 * 1024) {
+      setInputError('Choose a PDF, PNG, or JPG file no larger than 10 MB.')
+      return
+    }
+
+    setInputError('')
+    setFileName(file.name)
+    onVerify('upload', file.name)
+  }
 
   return (
     <div className="w-full">
@@ -81,13 +99,44 @@ export default function VerificationInput({ onVerify, loading }: Props) {
               Position the QR code within the frame
             </p>
             <button
-              onClick={() => onVerify('qr')}
+              onClick={() => onVerify('qr', 'demo-qr-token')}
               disabled={loading}
               className="flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold text-white transition-all duration-200"
               style={{ background: 'var(--blue)', boxShadow: '0 4px 16px rgba(0,80,245,0.25)', opacity: loading ? 0.6 : 1 }}
             >
               <ScanLine size={16} /> Use Demo QR
             </button>
+            <div className="w-full max-w-md">
+              <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--navy)', opacity: 0.55 }}>
+                Or enter a signed QR token
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={qrToken}
+                  onChange={e => setQrToken(e.target.value)}
+                  placeholder="Paste signed token"
+                  className="min-w-0 flex-1 px-4 py-3 rounded-2xl border text-sm font-mono outline-none"
+                  style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)', background: 'white' }}
+                />
+                <button
+                  onClick={() => {
+                    if (!qrToken.trim()) {
+                      setInputError('Enter a signed QR token to continue.')
+                      return
+                    }
+                    setInputError('')
+                    onVerify('qr', qrToken.trim())
+                  }}
+                  disabled={loading}
+                  className="px-4 py-3 rounded-2xl font-semibold text-white"
+                  style={{ background: 'var(--blue)', opacity: loading ? 0.6 : 1 }}
+                >
+                  Verify
+                </button>
+              </div>
+            </div>
+            {inputError && <p role="alert" className="text-sm text-red-600">{inputError}</p>}
           </motion.div>
         )}
 
@@ -99,7 +148,13 @@ export default function VerificationInput({ onVerify, loading }: Props) {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
           >
-            <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={() => onVerify('upload')} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+              className="hidden"
+              onChange={e => verifyFile(e.currentTarget.files?.[0])}
+            />
             <div
               className="flex flex-col items-center gap-4 py-10 px-6 rounded-3xl border-2 border-dashed cursor-pointer transition-all duration-200"
               style={{
@@ -109,7 +164,7 @@ export default function VerificationInput({ onVerify, loading }: Props) {
               onClick={() => fileRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); onVerify('upload') }}
+              onDrop={e => { e.preventDefault(); setDragOver(false); verifyFile(e.dataTransfer.files[0]) }}
             >
               <motion.div
                 animate={{ scale: dragOver ? 1.1 : 1 }}
@@ -120,7 +175,7 @@ export default function VerificationInput({ onVerify, loading }: Props) {
               </motion.div>
               <div className="text-center">
                 <p className="font-semibold text-sm mb-1" style={{ color: 'var(--navy)' }}>
-                  {dragOver ? 'Drop to verify' : 'Drop certificate here'}
+                  {dragOver ? 'Drop to verify' : fileName || 'Drop certificate here'}
                 </p>
                 <p className="text-xs" style={{ color: 'var(--navy)', opacity: 0.45 }}>PDF · PNG · JPG — max 10 MB</p>
               </div>
@@ -131,6 +186,7 @@ export default function VerificationInput({ onVerify, loading }: Props) {
                 Browse Files
               </span>
             </div>
+            {inputError && <p role="alert" className="mt-3 text-center text-sm text-red-600">{inputError}</p>}
             <p className="text-center text-xs mt-3" style={{ color: 'var(--navy)', opacity: 0.35 }}>
               Demo — click or drop to simulate verification
             </p>
@@ -160,10 +216,26 @@ export default function VerificationInput({ onVerify, loading }: Props) {
                   style={{ borderColor: 'var(--bg-5)', color: 'var(--navy)', background: 'white' }}
                   onFocus={e => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0,80,245,0.08)' }}
                   onBlur={e => { e.currentTarget.style.borderColor = 'var(--bg-5)'; e.currentTarget.style.boxShadow = 'none' }}
-                  onKeyDown={e => e.key === 'Enter' && onVerify('id', certId)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      if (!certId.trim()) {
+                        setInputError('Enter a certificate ID to continue.')
+                        return
+                      }
+                      setInputError('')
+                      onVerify('id', certId.trim())
+                    }
+                  }}
                 />
                 <button
-                  onClick={() => onVerify('id', certId || 'CV-2026-001245')}
+                  onClick={() => {
+                    if (!certId.trim()) {
+                      setInputError('Enter a certificate ID to continue.')
+                      return
+                    }
+                    setInputError('')
+                    onVerify('id', certId.trim())
+                  }}
                   disabled={loading}
                   className="px-5 py-3 rounded-2xl font-semibold text-white flex items-center gap-2 transition-all"
                   style={{ background: 'var(--blue)', boxShadow: '0 4px 12px rgba(0,80,245,0.25)', opacity: loading ? 0.6 : 1 }}
@@ -173,7 +245,11 @@ export default function VerificationInput({ onVerify, loading }: Props) {
               </div>
             </div>
             <button
-              onClick={() => onVerify('id', 'CV-2026-001245')}
+              onClick={() => {
+                setCertId('CV-2026-001245')
+                setInputError('')
+                onVerify('id', 'CV-2026-001245')
+              }}
               className="text-xs font-medium text-left transition-opacity"
               style={{ color: 'var(--blue)', opacity: 0.7 }}
               onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
@@ -181,6 +257,7 @@ export default function VerificationInput({ onVerify, loading }: Props) {
             >
               Use demo ID: CV-2026-001245 →
             </button>
+            {inputError && <p role="alert" className="text-sm text-red-600">{inputError}</p>}
           </motion.div>
         )}
       </AnimatePresence>

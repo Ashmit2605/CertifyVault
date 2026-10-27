@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Check,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 type ShareMode = "anyone" | "specific";
 
@@ -41,12 +42,21 @@ export default function Share() {
   const [expiry, setExpiry] = useState("7");
   const [linkGenerated, setLinkGenerated] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
+  const [showQr, setShowQr] = useState(false);
 
   const generatedLink = "certifyvault.com/share/8fK92xLq71QmP4";
 
-  const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(`https://${generatedLink}`);
+      setCopyError("");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopyError("Clipboard access was denied. Select and copy the link manually.");
+      setCopied(false);
+    }
   };
 
   return (
@@ -61,6 +71,9 @@ export default function Share() {
         </h1>
         <p className="mb-7 text-[14px] text-[#6B7494]">
           Generate a secure, verifiable link instead of sending a plain PDF.
+        </p>
+        <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="note">
+        Demo mode: link expiry, access revocation, and recipient permissions need backend enforcement.
         </p>
 
         {/* Who are you sharing with */}
@@ -188,7 +201,7 @@ export default function Share() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="flex flex-1 items-center justify-between gap-3 rounded-xl bg-[#F7F9FF] px-4 py-3">
                 <span className="truncate text-[13.5px] font-medium text-[#000F3E]">
-                  {generatedLink}
+                  https://{generatedLink}
                 </span>
                 <button
                   onClick={handleCopy}
@@ -205,11 +218,21 @@ export default function Share() {
                   )}
                 </button>
               </div>
-              <button className="flex items-center justify-center gap-2 rounded-xl border border-[#DCE6FB] px-4 py-3 text-[13.5px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]">
+              <button
+                onClick={() => setShowQr((visible) => !visible)}
+                className="flex items-center justify-center gap-2 rounded-xl border border-[#DCE6FB] px-4 py-3 text-[13.5px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]"
+                aria-expanded={showQr}
+              >
                 <QrCode className="h-4 w-4 text-[#0050F5]" />
-                Generate QR
+                {showQr ? "Hide QR" : "Generate QR"}
               </button>
             </div>
+            {showQr && (
+              <div className="mt-5 flex justify-center rounded-xl border border-[#EAF1FF] bg-white p-5">
+                <QRCodeSVG value={`https://${generatedLink}`} size={180} level="M" includeMargin />
+              </div>
+            )}
+            {copyError && <p className="mt-3 text-sm text-red-600" role="alert">{copyError}</p>}
             <p className="mt-3 text-[12.5px] text-[#9AA3C2]">
               Expires {expiry === "1" ? "in 1 day" : `in ${expiry} days`} · CV-VERIFY-8A72K9
             </p>

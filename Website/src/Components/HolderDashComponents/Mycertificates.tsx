@@ -1,72 +1,6 @@
 import { useState } from "react";
 import { Search, ShieldCheck, ShieldOff, Eye, Share2 } from "lucide-react";
-
-type Cert = {
-  id: string;
-  title: string;
-  issuer: string;
-  icon: string;
-  status: "Verified" | "Revoked";
-  issued: string;
-  type: string;
-};
-
-const CERTIFICATES: Cert[] = [
-  {
-    id: "CV-2026-001245",
-    title: "B.E. Computer Engineering",
-    issuer: "PCCOER",
-    icon: "🎓",
-    status: "Verified",
-    issued: "June 2026",
-    type: "Degree",
-  },
-  {
-    id: "CV-2026-000987",
-    title: "Internship Certificate",
-    issuer: "ABC Technologies",
-    icon: "💼",
-    status: "Verified",
-    issued: "May 2026",
-    type: "Internship",
-  },
-  {
-    id: "CV-2025-004521",
-    title: "Data Structures & Algorithms",
-    issuer: "NPTEL",
-    icon: "📘",
-    status: "Verified",
-    issued: "Dec 2025",
-    type: "Course",
-  },
-  {
-    id: "CV-2025-003310",
-    title: "Cloud Computing Fundamentals",
-    issuer: "AWS Academy",
-    icon: "☁️",
-    status: "Verified",
-    issued: "Oct 2025",
-    type: "Training",
-  },
-  {
-    id: "CV-2025-002187",
-    title: "Hackathon Winner — SIH 2025",
-    issuer: "Smart India Hackathon",
-    icon: "🏆",
-    status: "Verified",
-    issued: "Sep 2025",
-    type: "Other",
-  },
-  {
-    id: "CV-2024-009911",
-    title: "Web Development Bootcamp",
-    issuer: "XYZ Corp",
-    icon: "💻",
-    status: "Revoked",
-    issued: "Jan 2024",
-    type: "Training",
-  },
-];
+import { HOLDER_CERTIFICATES } from "../../data/holderMockData";
 
 const FILTERS = ["All", "Degree", "Course", "Internship", "Training", "Other"];
 
@@ -74,7 +8,7 @@ export default function MyCertificates() {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
 
-  const filtered = CERTIFICATES.filter((c) => {
+  const filtered = HOLDER_CERTIFICATES.filter((c) => {
     const matchesFilter = filter === "All" || c.type === filter;
     const matchesQuery =
       c.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -90,7 +24,7 @@ export default function MyCertificates() {
               My Certificates
             </h1>
             <p className="mt-1 text-[14px] text-[#6B7494]">
-              Your digital credential wallet — {CERTIFICATES.length} credentials
+              Your digital credential wallet — {HOLDER_CERTIFICATES.length} credentials
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-[#E4EAFB] bg-white px-3.5 py-2.5 text-[#8993B4] sm:w-72">

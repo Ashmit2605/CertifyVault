@@ -294,15 +294,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
 
 export function HolderDashboardLayout() {
   return (
-    <div
-      className="min-h-screen bg-gray-50"
-      style={{ fontFamily: "'Urbanist', sans-serif" }}
-    >
-      <link
-        href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
-      <style>{`* { font-family: 'Urbanist', sans-serif; }`}</style>
+    <div className="min-h-screen bg-gray-50">
       <TopNav />
       <main className="min-h-screen">
         <Outlet />
