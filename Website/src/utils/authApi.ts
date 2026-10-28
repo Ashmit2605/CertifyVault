@@ -12,6 +12,20 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export type AdminAccount = Pick<
+  UserProfile,
+  | "id"
+  | "clerkId"
+  | "email"
+  | "firstName"
+  | "lastName"
+  | "institutionName"
+  | "isActive"
+  | "createdAt"
+> & {
+  role: "issuer" | "verifier";
+};
+
 const apiBaseUrl = (
   import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 ).replace(/\/+$/, "");
@@ -92,6 +106,92 @@ function parseUserProfile(response: unknown): UserProfile {
     isActive: user.isActive,
     createdAt: user.createdAt,
   };
+}
+
+function parseAdminAccount(account: unknown): AdminAccount {
+  if (
+    typeof account !== "object" ||
+    account === null ||
+    !("id" in account) ||
+    typeof account.id !== "number" ||
+    !("clerkId" in account) ||
+    typeof account.clerkId !== "string" ||
+    !("email" in account) ||
+    typeof account.email !== "string" ||
+    !("firstName" in account) ||
+    typeof account.firstName !== "string" ||
+    !("lastName" in account) ||
+    typeof account.lastName !== "string" ||
+    !("role" in account) ||
+    (account.role !== "issuer" && account.role !== "verifier") ||
+    !("institutionName" in account) ||
+    !(typeof account.institutionName === "string" || account.institutionName === null) ||
+    !("isActive" in account) ||
+    typeof account.isActive !== "boolean" ||
+    !("createdAt" in account) ||
+    typeof account.createdAt !== "string"
+  ) {
+    throw new Error("The account service returned an invalid account.");
+  }
+
+  return {
+    id: account.id,
+    clerkId: account.clerkId,
+    email: account.email,
+    firstName: account.firstName,
+    lastName: account.lastName,
+    role: account.role,
+    institutionName: account.institutionName,
+    isActive: account.isActive,
+    createdAt: account.createdAt,
+  };
+}
+
+export async function getAdminAccounts(
+  token: string,
+  role: AdminAccount["role"],
+): Promise<AdminAccount[]> {
+  const response = await authRequest(`/admin/accounts?role=${role}`, token);
+  if (typeof response !== "object" || response === null || !("data" in response)) {
+    throw new Error("The account service returned an invalid account list.");
+  }
+
+  const { data } = response;
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("accounts" in data) ||
+    !Array.isArray(data.accounts)
+  ) {
+    throw new Error("The account service returned an invalid account list.");
+  }
+
+  return data.accounts.map(parseAdminAccount);
+}
+
+export async function setAccountActivation(
+  token: string,
+  clerkId: string,
+  isActive: boolean,
+): Promise<AdminAccount> {
+  const response = await authRequest(
+    `/users/${encodeURIComponent(clerkId)}/activation`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ isActive }),
+    },
+  );
+  if (typeof response !== "object" || response === null || !("data" in response)) {
+    throw new Error("The account service returned an invalid activation response.");
+  }
+
+  const { data } = response;
+  if (typeof data !== "object" || data === null || !("user" in data)) {
+    throw new Error("The account service returned an invalid activation response.");
+  }
+
+  return parseAdminAccount(data.user);
 }
 
 export async function registerUser(

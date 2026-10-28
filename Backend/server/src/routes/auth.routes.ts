@@ -1,5 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db/index.js";
@@ -93,7 +93,7 @@ router.post("/register", authMiddleware, async (req, res) => {
         lastName,
         role: parsed.data.role,
         institutionName: parsed.data.institutionName ?? null,
-        isActive: parsed.data.role !== "issuer",
+        isActive: parsed.data.role === "holder",
       })
       .onConflictDoNothing()
       .returning({ id: users.id });
@@ -198,6 +198,48 @@ router.get("/me", authMiddleware, async (_req, res) => {
   }
 });
 
+router.get(
+  "/admin/accounts",
+  authMiddleware,
+  requireRole("admin"),
+  async (req, res) => {
+    const parsedRole = z.enum(["issuer", "verifier"]).safeParse(req.query.role);
+    if (!parsedRole.success) {
+      res.status(400).json({
+        success: false,
+        message: "An issuer or verifier role is required.",
+      });
+      return;
+    }
+
+    try {
+      const accounts = await db
+        .select({
+          id: users.id,
+          clerkId: users.clerkId,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          institutionName: users.institutionName,
+          isActive: users.isActive,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .where(eq(users.role, parsedRole.data))
+        .orderBy(desc(users.createdAt));
+
+      res.json({ success: true, data: { accounts } });
+    } catch (error) {
+      console.error("Admin account lookup failed:", error);
+      res.status(500).json({
+        success: false,
+        message: "Unable to load accounts for review.",
+      });
+    }
+  },
+);
+
 router.patch(
   "/users/:clerkId/activation",
   authMiddleware,
@@ -217,17 +259,29 @@ router.patch(
       const [user] = await db
         .update(users)
         .set({ isActive: parsed.data.isActive, updatedAt: new Date() })
-        .where(eq(users.clerkId, clerkId.data))
+        .where(
+          and(
+            eq(users.clerkId, clerkId.data),
+            inArray(users.role, ["issuer", "verifier"]),
+          ),
+        )
         .returning({
           id: users.id,
           clerkId: users.clerkId,
           email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
           role: users.role,
+          institutionName: users.institutionName,
           isActive: users.isActive,
+          createdAt: users.createdAt,
         });
 
       if (!user) {
-        res.status(404).json({ success: false, message: "User not found." });
+        res.status(404).json({
+          success: false,
+          message: "Issuer or verifier account not found.",
+        });
         return;
       }
 

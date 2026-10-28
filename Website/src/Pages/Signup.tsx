@@ -658,7 +658,9 @@ function StepSuccess({ role, pendingApproval }: { role: Role; pendingApproval: b
         Account created!
       </h2>
       <p className="text-sm mb-8 max-w-xs" style={{ color: 'var(--navy)', opacity: 0.55 }}>
-        Welcome to CertifyVault. Your {roleData.label.toLowerCase()} account is ready.
+        {pendingApproval
+          ? `Your ${roleData.label.toLowerCase()} account is pending administrator approval. You can access your dashboard once it is activated.`
+          : `Welcome to CertifyVault. Your ${roleData.label.toLowerCase()} account is ready.`}
       </p>
 
       <div

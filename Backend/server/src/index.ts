@@ -37,16 +37,6 @@ app.use(
     legacyHeaders: false,
   }),
 );
-app.use(
-  "/api/auth",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 20,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-  }),
-);
-
 app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",

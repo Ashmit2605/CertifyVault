@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
   LayoutGrid,
-  Landmark,
-  Users,
   FileStack,
   ShieldCheck,
+  BadgeCheck,
   ShieldAlert,
   Boxes,
   Activity,
@@ -59,24 +58,17 @@ const NAV_ITEMS: NavItem[] = [
   },
 
   {
-    key: "institutions",
-    label: "Institutions",
-    icon: Landmark,
-    path: "/admindashboard/institutions"
-  },
-
-  {
-    key: "users",
-    label: "Users",
-    icon: Users,
-    path: "/admindashboard/users"
-  },
-
-  {
     key: "issuers",
     label: "Issuers",
     icon: FileStack,
     path: "/admindashboard/issuers"
+  },
+
+  {
+    key: "verifiers",
+    label: "Verifiers",
+    icon: BadgeCheck,
+    path: "/admindashboard/verifiers"
   },
 
   {

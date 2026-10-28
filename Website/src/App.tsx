@@ -90,9 +90,8 @@ const HolderProfile = lazy(() => import("./Components/HolderDashComponents/Profi
 // Administrator dashboard
 const AdminDashLayout = lazy(() => import("./Pages/AdminDashLayout/AdminDashLayout"));
 const AdminOverview = lazy(() => import("./Components/AdminDashComponents/Overview"));
-const AdminInstitutions = lazy(() => import("./Components/AdminDashComponents/Institutions"));
-const AdminUsers = lazy(() => import("./Components/AdminDashComponents/Users"));
 const AdminIssuers = lazy(() => import("./Components/AdminDashComponents/Issuers"));
+const AdminVerifiers = lazy(() => import("./Components/AdminDashComponents/Verifiers"));
 const AdminVerification = lazy(() => import("./Components/AdminDashComponents/Verification"));
 const AdminFraud = lazy(() => import("./Components/AdminDashComponents/Fraud"));
 const AdminBlockchain = lazy(() => import("./Components/AdminDashComponents/Blockchain"));
@@ -265,9 +264,8 @@ export default function App() {
       {/* ── Admin Dashboard ── */}
       <Route path="/admindashboard" element={<RequireAuth role="admin"><AdminDashLayout /></RequireAuth>}>
         <Route index element={<AdminOverview />} />
-        <Route path="institutions" element={<AdminInstitutions />} />
-        <Route path="users" element={<AdminUsers />} />
         <Route path="issuers" element={<AdminIssuers />} />
+        <Route path="verifiers" element={<AdminVerifiers />} />
         <Route path="verification" element={<AdminVerification />} />
         <Route path="fraud" element={<AdminFraud />} />
         <Route path="blockchain" element={<AdminBlockchain />} />

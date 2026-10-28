@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useClerk } from '@clerk/clerk-react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Bell, ChevronDown, Menu, X, LayoutDashboard, ScanLine, History, Bookmark, FileText } from 'lucide-react'
+import { Search, Bell, ChevronDown, Menu, X, LayoutDashboard, ScanLine, History, Bookmark, FileText, LogOut } from 'lucide-react'
 import Logo from '../../assets/Logo.webp'
 
 const navItems = [
@@ -15,6 +16,11 @@ const navItems = [
 export default function VerifierNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const { signOut } = useClerk()
+
+  const handleLogout = () => {
+    void signOut({ redirectUrl: '/app/login' })
+  }
 
   const isActive = (href: string) =>
     href === '/verifierdashboard'
@@ -94,6 +100,14 @@ export default function VerifierNavbar() {
               </span>
               <ChevronDown size={14} className="text-gray-400" />
             </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
           </div>
 
           {/* Mobile toggle */}
@@ -143,6 +157,14 @@ export default function VerifierNavbar() {
                   </Link>
                 </motion.div>
               ))}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-3 rounded-lg px-3 py-3 text-left font-semibold text-red-600 transition-colors hover:bg-red-50"
+              >
+                <LogOut size={18} strokeWidth={2} />
+                <span>Logout</span>
+              </button>
             </div>
           </motion.div>
         )}
