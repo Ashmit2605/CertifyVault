@@ -5,7 +5,9 @@ import rateLimit from "express-rate-limit";
 import "dotenv/config";
 
 import authRoutes from "./routes/auth.routes.js";
+import blockchainRoutes from "./routes/blockchain.routes.js";
 import certificateRoutes from "./routes/certificate.routes.js";
+import issuerRoutes from "./routes/issuer.routes.js";
 import verificationRoutes from "./routes/verification.routes.js";
 
 const app = express();
@@ -46,6 +48,8 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/certificates", certificateRoutes);
+app.use("/api/issuer", issuerRoutes);
+app.use("/api/blockchain", blockchainRoutes);
 app.use("/api/verification", verificationRoutes);
 
 app.use(

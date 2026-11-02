@@ -1,527 +1,716 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
 import {
-  Check, Loader2, GraduationCap, BookOpen, Briefcase, Award,
-  Search, ArrowLeft, ArrowRight, ShieldCheck, Download, Eye,
-  UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, X,
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  Loader2,
+  ShieldCheck,
+  UploadCloud,
+  X,
 } from "lucide-react";
 import { PageHeader } from "../../../../Pages/IssuerDashLayout/IssuerDashLayout";
+import {
+  downloadCertificate,
+  issueCertificate,
+  retryRegistration,
+  type CertificateIssueInput,
+  type CertificateRecord,
+} from "../../../../utils/certificateApi";
 
-/* ══════════════════════════════════════════════════════
-   1. PIPELINE PROGRESS (shared by single + bulk flows)
-   ══════════════════════════════════════════════════════ */
+const certificateTypes = [
+  { value: "degree", label: "Degree Certificate" },
+  { value: "diploma", label: "Diploma" },
+  { value: "bonafide", label: "Bonafide" },
+  { value: "course", label: "Course Certificate" },
+  { value: "internship", label: "Internship Certificate" },
+  { value: "training", label: "Training Certificate" },
+  { value: "achievement", label: "Achievement Certificate" },
+  { value: "custom", label: "Custom Certificate" },
+];
 
-interface PipelineProgressProps {
-  steps: string[];
-  running: boolean;
-  stepDuration?: number;
-  onComplete?: () => void;
+const initialForm = (): CertificateIssueInput => ({
+  studentName: "",
+  certificateNumber: null,
+  certificateType: "degree",
+  title: "",
+  course: "",
+  grade: null,
+  issueDate: new Date().toISOString().slice(0, 10),
+  expiryDate: null,
+});
+
+interface BulkRow {
+  line: number;
+  input: CertificateIssueInput | null;
+  error: string | null;
+  certificateNumber?: string;
+  result?: CertificateRecord;
+  resultError?: string;
 }
 
-function PipelineProgress({ steps, running, stepDuration = 900, onComplete }: PipelineProgressProps) {
-  const [activeIndex, setActiveIndex] = useState(-1);
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
 
-  useEffect(() => {
-    if (!running) {
-      setActiveIndex(-1);
-      return;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        field += character;
+      }
+    } else if (character === '"' && field.length === 0) {
+      quoted = true;
+    } else if (character === ",") {
+      row.push(field.trim());
+      field = "";
+    } else if (character === "\n" || character === "\r") {
+      if (character === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(field.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += character;
     }
-    setActiveIndex(0);
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    steps.forEach((_, i) => {
-      const t = setTimeout(() => {
-        setActiveIndex(i + 1);
-        if (i === steps.length - 1) onComplete?.();
-      }, stepDuration * (i + 1));
-      timers.push(t);
-    });
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
-
-  return (
-    <div className="space-y-3">
-      {steps.map((step, i) => {
-        const isDone = activeIndex > i;
-        const isActive = activeIndex === i;
-        return (
-          <div key={step} className="flex items-center gap-3">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                isDone ? "bg-emerald-500 text-white" : isActive ? "bg-brand text-white" : "bg-brand-light text-slate-400"
-              }`}
-            >
-              {isDone ? <Check size={14} /> : isActive ? <Loader2 size={14} className="animate-spin" /> : <span className="text-xs font-semibold">{i + 1}</span>}
-            </div>
-            <span className={`text-sm ${isDone || isActive ? "text-navy font-medium" : "text-slate-400"}`}>{step}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  }
+  if (quoted) throw new Error("CSV contains an unclosed quoted field.");
+  row.push(field.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
 }
 
-/* ══════════════════════════════════════════════════════
-   2. BULK ISSUANCE (tab)
-   ══════════════════════════════════════════════════════ */
+function parseBulkCsv(text: string): BulkRow[] {
+  const rows = parseCsv(text);
+  if (rows.length < 2) {
+    throw new Error("The CSV must include a header and at least one certificate.");
+  }
+  if (rows.length > 51) {
+    throw new Error("Upload at most 50 records per batch.");
+  }
 
-const bulkPipelineSteps = [
-  "Validating records",
-  "Generating certificates",
-  "Computing SHA-256 hashes",
-  "Registering on blockchain",
-  "Generating QR codes",
-  "Certificates issued",
-];
+  const headers = rows[0].map((header) => header.trim().toLowerCase());
+  const required = [
+    "studentname",
+    "certificatetype",
+    "title",
+    "course",
+    "issuedate",
+  ];
+  const missing = required.filter((header) => !headers.includes(header));
+  if (missing.length) {
+    throw new Error(`Missing CSV columns: ${missing.join(", ")}.`);
+  }
 
-function BulkIssuance() {
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [validated, setValidated] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-
-  // 🔧 Replace with real file parsing (e.g. papaparse / SheetJS) + API validation
-  const mockValidation = { total: 500, valid: 498, errors: 2 };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      setValidated(false);
-      setIsDone(false);
+  const index = (name: string) => headers.indexOf(name);
+  const parsedRows = rows.slice(1).map((cells, rowIndex) => {
+    const value = (name: string) => cells[index(name)]?.trim() ?? "";
+    const input: CertificateIssueInput = {
+      studentName: value("studentname"),
+      certificateNumber: value("certificatenumber") || null,
+      certificateType: value("certificatetype").toLowerCase(),
+      title: value("title"),
+      course: value("course"),
+      grade: value("grade") || null,
+      issueDate: value("issuedate"),
+      expiryDate: value("expirydate") || null,
+    };
+    const errors: string[] = [];
+    if (!input.studentName) errors.push("Student name is required.");
+    if (!certificateTypes.some((type) => type.value === input.certificateType)) {
+      errors.push("Certificate type is invalid.");
     }
-  };
-
-  const handleValidate = () => setValidated(true);
-  const handleGenerate = () => setIsProcessing(true);
-  const handleComplete = () => {
-    setIsProcessing(false);
-    setIsDone(true);
-  };
-  const reset = () => {
-    setFileName(null);
-    setValidated(false);
-    setIsProcessing(false);
-    setIsDone(false);
-  };
-
-  return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      {!fileName && (
-        <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-2xl py-12 cursor-pointer hover:border-brand/40 hover:bg-brand-light/40 transition-colors">
-          <UploadCloud size={32} className="text-brand" />
-          <p className="text-sm font-medium text-navy">Upload Excel or CSV file</p>
-          <p className="text-xs text-slate-400">Student names, roll numbers, course, grade columns required</p>
-          <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
-        </label>
-      )}
-
-      {fileName && !isProcessing && !isDone && (
-        <div className="rounded-xl border border-slate-200 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <FileSpreadsheet className="text-brand" size={22} />
-            <div>
-              <p className="text-sm font-medium text-navy">{fileName}</p>
-              <p className="text-xs text-slate-400">Ready to validate</p>
-            </div>
-          </div>
-          <button onClick={reset} className="p-1.5 rounded-lg hover:bg-brand-light text-slate-400">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {fileName && !validated && !isProcessing && !isDone && (
-        <button onClick={handleValidate} className="w-full py-2.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand/90 transition-colors">
-          Validate Records
-        </button>
-      )}
-
-      {validated && !isProcessing && !isDone && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-brand-light p-4 text-center">
-              <p className="text-2xl font-bold text-navy">{mockValidation.total}</p>
-              <p className="text-xs text-slate-500 mt-1">Total Records</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-4 text-center">
-              <p className="text-2xl font-bold text-emerald-600">{mockValidation.valid}</p>
-              <p className="text-xs text-slate-500 mt-1">Valid</p>
-            </div>
-            <div className="rounded-xl bg-rose-50 p-4 text-center">
-              <p className="text-2xl font-bold text-rose-500">{mockValidation.errors}</p>
-              <p className="text-xs text-slate-500 mt-1">Errors</p>
-            </div>
-          </div>
-
-          {mockValidation.errors > 0 && (
-            <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-              <span>2 rows have missing roll numbers. These will be skipped during generation.</span>
-            </div>
-          )}
-
-          <button
-            onClick={handleGenerate}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand/90 transition-colors"
-          >
-            <CheckCircle2 size={16} /> Generate {mockValidation.valid} Certificates
-          </button>
-        </div>
-      )}
-
-      {(isProcessing || isDone) && (
-        <div className="max-w-md mx-auto py-4">
-          {!isDone ? (
-            <PipelineProgress steps={bulkPipelineSteps} running={isProcessing} onComplete={handleComplete} />
-          ) : (
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="text-emerald-500" size={28} />
-              </div>
-              <h3 className="font-semibold text-navy text-lg">{mockValidation.valid} Certificates Issued</h3>
-              <p className="text-sm text-slate-500 mt-1">All certificates have been generated, hashed, and registered on-chain.</p>
-              <button onClick={reset} className="mt-6 px-4 py-2 rounded-lg bg-brand-light text-brand text-sm font-medium hover:bg-brand/10 transition-colors">
-                Upload Another Batch
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+    if (!input.title) errors.push("Title is required.");
+    if (!input.course) errors.push("Course is required.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.issueDate)) {
+      errors.push("Issue date must use YYYY-MM-DD.");
+    }
+    if (input.expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.expiryDate)) {
+      errors.push("Expiry date must use YYYY-MM-DD.");
+    }
+    return {
+      line: rowIndex + 2,
+      input: errors.length ? null : input,
+      error: errors.length ? errors.join(" ") : null,
+      certificateNumber: input.certificateNumber ?? undefined,
+    };
+  });
+  const certificateNumberCounts = new Map<string, number>();
+  for (const row of parsedRows) {
+    if (row.certificateNumber) {
+      const key = row.certificateNumber.toLocaleLowerCase();
+      certificateNumberCounts.set(key, (certificateNumberCounts.get(key) ?? 0) + 1);
+    }
+  }
+  return parsedRows.map((row) => {
+    if (
+      row.certificateNumber &&
+      (certificateNumberCounts.get(row.certificateNumber.toLocaleLowerCase()) ??
+        0) > 1
+    ) {
+      return {
+        ...row,
+        input: null,
+        error: [row.error, "Certificate number is duplicated in this file."]
+          .filter(Boolean)
+          .join(" "),
+      };
+    }
+    return row;
+  });
 }
 
-/* ══════════════════════════════════════════════════════
-   3. ISSUE CERTIFICATE (default export — the page)
-   ══════════════════════════════════════════════════════ */
-
-// 🔧 Replace with your API call
-const mockStudents = [
-  { id: "STU-1001", name: "Aditi Rao", email: "aditi.rao@college.edu", rollNo: "CS2021045", branch: "Computer Science" },
-  { id: "STU-1002", name: "Rohan Mehta", email: "rohan.mehta@college.edu", rollNo: "ME2021012", branch: "Mechanical Engg." },
-  { id: "STU-1003", name: "Sara Khan", email: "sara.khan@college.edu", rollNo: "EC2021078", branch: "Electronics" },
-  { id: "STU-1004", name: "Vikram Singh", email: "vikram.singh@college.edu", rollNo: "CS2021099", branch: "Computer Science" },
-];
-
-const certTypes = [
-  { value: "degree", label: "Degree Certificate", icon: GraduationCap },
-  { value: "course", label: "Course Certificate", icon: BookOpen },
-  { value: "internship", label: "Internship Certificate", icon: Briefcase },
-  { value: "training", label: "Training Certificate", icon: Award },
-];
-
-const wizardSteps = ["Select Student", "Certificate Type", "Fill Details", "Preview", "Issue"];
-
-const pipelineSteps = [
-  "Generating PDF",
-  "Generating QR Code",
-  "Computing SHA-256 Hash",
-  "Registering on Blockchain",
-  "Certificate Issued",
-];
-
-function StepIndicator({ currentStep }: { currentStep: number }) {
+function StatusMessage({ certificate }: { certificate: CertificateRecord }) {
+  if (certificate.status === "issued") {
+    return (
+      <p className="mt-1 text-sm text-emerald-700">
+        Blockchain registration confirmed.
+      </p>
+    );
+  }
+  if (certificate.status === "registration_failed") {
+    return (
+      <p className="mt-1 text-sm text-rose-600">
+        Registration failed. The private PDF is not available until confirmation.
+      </p>
+    );
+  }
   return (
-    <div className="flex items-center mb-8">
-      {wizardSteps.map((label, i) => (
-        <div key={label} className="flex items-center flex-1 last:flex-none">
-          <div className="flex flex-col items-center gap-1.5">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
-                i < currentStep ? "bg-brand text-white" : i === currentStep ? "bg-navy text-white" : "bg-brand-light text-slate-400"
-              }`}
-            >
-              {i < currentStep ? <Check size={14} /> : i + 1}
-            </div>
-            <span className={`text-xs whitespace-nowrap ${i === currentStep ? "text-navy font-semibold" : "text-slate-400"}`}>{label}</span>
-          </div>
-          {i < wizardSteps.length - 1 && <div className={`flex-1 h-0.5 mx-2 ${i < currentStep ? "bg-brand" : "bg-brand-light"}`} />}
-        </div>
-      ))}
-    </div>
+    <p className="mt-1 text-sm text-amber-700">
+      Registration submitted. The certificate is not issued until confirmation.
+    </p>
   );
 }
 
 export default function IssueCertificate() {
+  const { getToken } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"single" | "bulk">("single");
-  const [step, setStep] = useState(0);
-  const [studentSearch, setStudentSearch] = useState("");
+  const [form, setForm] = useState<CertificateIssueInput>(initialForm);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [issued, setIssued] = useState<CertificateRecord | null>(null);
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkError, setBulkError] = useState("");
 
-  const [selectedStudent, setSelectedStudent] = useState<typeof mockStudents[0] | null>(null);
-  const [certType, setCertType] = useState<string | null>(null);
-  const [details, setDetails] = useState({
-    title: "",
-    program: "",
-    grade: "",
-    issueDate: new Date().toISOString().slice(0, 10),
-    expiryDate: "",
-    notes: "",
-  });
+  const updateForm = <K extends keyof CertificateIssueInput>(
+    key: K,
+    value: CertificateIssueInput[K],
+  ) => setForm((current) => ({ ...current, [key]: value }));
 
-  const [isIssuing, setIsIssuing] = useState(false);
-  const [issuedCertId, setIssuedCertId] = useState<string | null>(null);
-
-  const filteredStudents = mockStudents.filter(
-    (s) => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.rollNo.toLowerCase().includes(studentSearch.toLowerCase())
-  );
-
-  const canGoNext =
-    (step === 0 && selectedStudent) ||
-    (step === 1 && certType) ||
-    (step === 2 && details.title && details.program) ||
-    step === 3;
-
-  const handleIssue = () => {
-    setStep(4);
-    setIsIssuing(true);
+  const handleIssue = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      const certificate = await issueCertificate(token, form);
+      setIssued(certificate);
+    } catch (issueError) {
+      setError(
+        issueError instanceof Error
+          ? issueError.message
+          : "Certificate issuance failed.",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handlePipelineComplete = () => {
-    setIssuedCertId(`CERT-2026-${Math.floor(10000 + Math.random() * 89999)}`);
-    setIsIssuing(false);
+  const handleRetry = async () => {
+    if (!issued) return;
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      setIssued(await retryRegistration(token, issued.certificateId));
+    } catch (retryError) {
+      setError(
+        retryError instanceof Error
+          ? retryError.message
+          : "Registration retry failed.",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const resetWizard = () => {
-    setStep(0);
-    setSelectedStudent(null);
-    setCertType(null);
-    setDetails({ title: "", program: "", grade: "", issueDate: new Date().toISOString().slice(0, 10), expiryDate: "", notes: "" });
-    setIssuedCertId(null);
+  const handleDownload = async (certificate: CertificateRecord) => {
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      const blob = await downloadCertificate(token, certificate.certificateId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${certificate.certificateId}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      setError(
+        downloadError instanceof Error
+          ? downloadError.message
+          : "Certificate download failed.",
+      );
+    }
+  };
+
+  const handleCsv = async (file: File | undefined) => {
+    setBulkError("");
+    setBulkRows([]);
+    if (!file) return;
+    if (file.size > 1_000_000) {
+      setBulkError("CSV files must be smaller than 1 MB.");
+      return;
+    }
+    try {
+      setBulkRows(parseBulkCsv(await file.text()));
+    } catch (parseError) {
+      setBulkError(
+        parseError instanceof Error ? parseError.message : "CSV could not be read.",
+      );
+    }
+  };
+
+  const handleBulkIssue = async () => {
+    const validRows = bulkRows.filter(
+      (row): row is BulkRow & { input: CertificateIssueInput } =>
+        row.input !== null,
+    );
+    if (!validRows.length) return;
+    setBulkBusy(true);
+    setBulkProgress(0);
+    setBulkError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      for (let index = 0; index < validRows.length; index += 1) {
+        const row = validRows[index];
+        try {
+          row.result = await issueCertificate(token, row.input);
+        } catch (rowError) {
+          row.resultError =
+            rowError instanceof Error ? rowError.message : "Issuance failed.";
+        }
+        setBulkRows((current) =>
+          current.map((item) => (item.line === row.line ? { ...row } : item)),
+        );
+        setBulkProgress(index + 1);
+      }
+    } catch (batchError) {
+      setBulkError(
+        batchError instanceof Error
+          ? batchError.message
+          : "Bulk issuance could not start.",
+      );
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const resetSingle = () => {
+    setIssued(null);
+    setError("");
+    setForm(initialForm());
   };
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <PageHeader title="Issue Certificate" description="Create and issue a verified certificate to a student" />
-
-        {/* Tabs */}
-        <div className="flex gap-2 px-6 pt-4 border-b border-slate-100">
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <PageHeader
+          title="Issue Certificate"
+          description="Generate a signed, verifiable certificate for a student"
+        />
+        <div className="flex gap-2 border-b border-slate-100 px-6 pt-4">
           {(["single", "bulk"] as const).map((tab) => (
             <button
               key={tab}
+              type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab ? "border-brand text-brand" : "border-transparent text-slate-500 hover:text-navy"
+              className={`border-b-2 px-4 py-2.5 text-sm font-medium ${
+                activeTab === tab
+                  ? "border-brand text-brand"
+                  : "border-transparent text-slate-500 hover:text-navy"
               }`}
             >
-              {tab === "single" ? "Single Issuance" : "Bulk Issuance"}
+              {tab === "single" ? "Single issuance" : "Bulk CSV"}
             </button>
           ))}
         </div>
 
-        {activeTab === "single" ? (
-          <div className="p-6">
-            <StepIndicator currentStep={step} />
-
-            {/* Step 0 — Select Student */}
-            {step === 0 && (
-              <div className="space-y-4">
-                <div className="relative max-w-sm">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={studentSearch}
-                    onChange={(e) => setStudentSearch(e.target.value)}
-                    placeholder="Search by name or roll number..."
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40"
-                  />
-                </div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {filteredStudents.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedStudent(s)}
-                      className={`text-left p-4 rounded-xl border transition-colors ${
-                        selectedStudent?.id === s.id ? "border-brand bg-brand-light" : "border-slate-200 hover:border-brand/40 hover:bg-brand-light/40"
-                      }`}
-                    >
-                      <p className="font-semibold text-navy">{s.name}</p>
-                      <p className="text-xs text-slate-500">{s.rollNo} · {s.branch}</p>
-                      <p className="text-xs text-slate-400">{s.email}</p>
-                    </button>
-                  ))}
-                  {filteredStudents.length === 0 && (
-                    <p className="text-sm text-slate-400 col-span-2 py-6 text-center">No students found.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Step 1 — Certificate Type */}
-            {step === 1 && (
-              <div className="grid sm:grid-cols-2 gap-3">
-                {certTypes.map((type) => {
-                  const Icon = type.icon;
-                  return (
-                    <button
-                      key={type.value}
-                      onClick={() => setCertType(type.value)}
-                      className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                        certType === type.value ? "border-brand bg-brand-light" : "border-slate-200 hover:border-brand/40 hover:bg-brand-light/40"
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
-                        <Icon size={20} className="text-brand" />
-                      </div>
-                      <span className="font-medium text-navy">{type.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Step 2 — Fill Details */}
-            {step === 2 && (
-              <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium text-navy mb-1.5 block">Certificate Title</label>
-                  <input
-                    value={details.title}
-                    onChange={(e) => setDetails({ ...details, title: e.target.value })}
-                    placeholder="e.g. Bachelor of Technology"
-                    className="w-full px-3 py-2.5 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium text-navy mb-1.5 block">Program / Course Name</label>
-                  <input
-                    value={details.program}
-                    onChange={(e) => setDetails({ ...details, program: e.target.value })}
-                    placeholder="e.g. Computer Science & Engineering"
-                    className="w-full px-3 py-2.5 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-navy mb-1.5 block">Grade / CGPA</label>
-                  <input
-                    value={details.grade}
-                    onChange={(e) => setDetails({ ...details, grade: e.target.value })}
-                    placeholder="e.g. 8.7 CGPA"
-                    className="w-full px-3 py-2.5 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-navy mb-1.5 block">Issue Date</label>
-                  <input
-                    type="date"
-                    value={details.issueDate}
-                    onChange={(e) => setDetails({ ...details, issueDate: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-navy mb-1.5 block">Expiry Date (optional)</label>
-                  <input
-                    type="date"
-                    value={details.expiryDate}
-                    onChange={(e) => setDetails({ ...details, expiryDate: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium text-navy mb-1.5 block">Additional Notes (optional)</label>
-                  <textarea
-                    value={details.notes}
-                    onChange={(e) => setDetails({ ...details, notes: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2.5 rounded-lg bg-brand-light text-sm outline-none focus:ring-2 focus:ring-brand/40 resize-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Step 3 — Preview */}
-            {step === 3 && selectedStudent && (
-              <div className="max-w-xl mx-auto">
-                <div className="rounded-2xl border-2 border-brand/20 bg-brand-light p-8 text-center relative">
-                  <ShieldCheck className="mx-auto text-brand mb-3" size={36} />
-                  <p className="text-xs tracking-widest text-slate-500 uppercase">
-                    Certificate of {certTypes.find((t) => t.value === certType)?.label.replace(" Certificate", "")}
-                  </p>
-                  <h2 className="text-2xl font-bold text-navy mt-2">{details.title || "Certificate Title"}</h2>
-                  <p className="text-sm text-slate-500 mt-3">This is to certify that</p>
-                  <p className="text-xl font-semibold text-brand mt-1">{selectedStudent.name}</p>
-                  <p className="text-sm text-slate-500 mt-2">has successfully completed</p>
-                  <p className="font-medium text-navy">{details.program || "Program Name"}</p>
-                  {details.grade && <p className="text-sm text-slate-500 mt-1">with a grade of {details.grade}</p>}
-                  <div className="flex justify-between mt-6 pt-4 border-t border-brand/20 text-xs text-slate-500">
-                    <span>Issued: {details.issueDate}</span>
-                    <span>{selectedStudent.rollNo}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4 — Issue / Processing / Success */}
-            {step === 4 && (
-              <div className="max-w-md mx-auto py-4">
-                {!issuedCertId ? (
-                  <PipelineProgress steps={pipelineSteps} running={isIssuing} onComplete={handlePipelineComplete} />
-                ) : (
-                  <div className="text-center">
-                    <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-                      <Check className="text-emerald-500" size={28} />
-                    </div>
-                    <h3 className="font-semibold text-navy text-lg">Certificate Issued Successfully</h3>
-                    <p className="text-sm text-slate-500 mt-1">{issuedCertId}</p>
-                    <div className="flex items-center justify-center gap-3 mt-6">
-                      <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-light text-brand text-sm font-medium hover:bg-brand/10 transition-colors">
-                        <Eye size={16} /> View
-                      </button>
-                      <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-light text-brand text-sm font-medium hover:bg-brand/10 transition-colors">
-                        <Download size={16} /> Download PDF
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-center gap-3 mt-4">
-                      <button onClick={resetWizard} className="text-sm text-slate-500 hover:text-navy transition-colors">
-                        Issue another
-                      </button>
-                      <span className="text-slate-300">·</span>
-                      <button
-                        onClick={() => navigate("/issuerdashboard/certificates")}
-                        className="text-sm text-slate-500 hover:text-navy transition-colors"
-                      >
-                        Back to Certificates
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Navigation buttons */}
-            {step < 4 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-                <button
-                  onClick={() => setStep((s) => Math.max(0, s - 1))}
-                  disabled={step === 0}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-slate-600 disabled:opacity-40 hover:bg-brand-light transition-colors"
+        {activeTab === "single" && (
+          <div className="grid gap-8 p-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-navy">
+                  Certificate template
+                </label>
+                <select
+                  value={form.certificateType}
+                  onChange={(event) =>
+                    updateForm("certificateType", event.target.value)
+                  }
+                  className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
                 >
-                  <ArrowLeft size={16} /> Back
-                </button>
-
-                {step === 3 ? (
-                  <button
-                    onClick={handleIssue}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-brand text-white hover:bg-brand/90 transition-colors"
-                  >
-                    Issue Certificate <ShieldCheck size={16} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setStep((s) => s + 1)}
-                    disabled={!canGoNext}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-medium bg-brand text-white disabled:opacity-40 hover:bg-brand/90 transition-colors"
-                  >
-                    Next <ArrowRight size={16} />
-                  </button>
-                )}
+                  {certificateTypes.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  Uses the built-in print-ready certificate layout.
+                </p>
               </div>
-            )}
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-navy">
+                  Student name
+                </label>
+                <input
+                  value={form.studentName}
+                  maxLength={255}
+                  onChange={(event) => updateForm("studentName", event.target.value)}
+                  className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-navy">
+                  Certificate number (optional)
+                </label>
+                <input
+                  value={form.certificateNumber ?? ""}
+                  maxLength={100}
+                  onChange={(event) =>
+                    updateForm("certificateNumber", event.target.value || null)
+                  }
+                  className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-navy">
+                  Certificate title
+                </label>
+                <input
+                  value={form.title}
+                  maxLength={255}
+                  onChange={(event) => updateForm("title", event.target.value)}
+                  placeholder="Bachelor of Technology"
+                  className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                  required
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-navy">
+                    Degree / course
+                  </label>
+                  <input
+                    value={form.course}
+                    maxLength={255}
+                    onChange={(event) => updateForm("course", event.target.value)}
+                    className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-navy">
+                    Grade / CGPA
+                  </label>
+                  <input
+                    value={form.grade ?? ""}
+                    maxLength={50}
+                    onChange={(event) =>
+                      updateForm("grade", event.target.value || null)
+                    }
+                    className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-navy">
+                    Issue date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.issueDate}
+                    onChange={(event) => updateForm("issueDate", event.target.value)}
+                    className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-navy">
+                    Expiry date (optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={form.expiryDate ?? ""}
+                    min={form.issueDate}
+                    onChange={(event) =>
+                      updateForm("expiryDate", event.target.value || null)
+                    }
+                    className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40"
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+                  {error}
+                </p>
+              )}
+
+              {!issued ? (
+                <button
+                  type="button"
+                  onClick={() => void handleIssue()}
+                  disabled={
+                    busy ||
+                    !form.studentName.trim() ||
+                    !form.title.trim() ||
+                    !form.course.trim() ||
+                    !form.issueDate
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                  {busy ? "Generating and registering…" : "Review & issue"}
+                </button>
+              ) : (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start gap-3">
+                    {issued.status === "issued" ? (
+                      <CheckCircle2 className="mt-0.5 text-emerald-500" size={20} />
+                    ) : (
+                      <AlertTriangle className="mt-0.5 text-amber-500" size={20} />
+                    )}
+                    <div className="min-w-0">
+                      <p className="break-all font-semibold text-navy">
+                        {issued.certificateId}
+                      </p>
+                      <StatusMessage certificate={issued} />
+                      {issued.blockchainTxHash && (
+                        <p className="mt-2 break-all text-xs text-slate-500">
+                          Transaction: {issued.blockchainTxHash}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {issued.status === "issued" && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDownload(issued)}
+                        className="flex items-center gap-2 rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand"
+                      >
+                        <Download size={15} /> Download PDF
+                      </button>
+                    )}
+                    {(issued.status === "registration_failed" ||
+                      issued.status === "pending_registration") && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleRetry()}
+                        className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
+                      >
+                        {busy ? "Checking…" : "Check / retry registration"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={resetSingle}
+                      className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                      Issue another
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/issuerdashboard/certificates")}
+                      className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                      <ArrowLeft size={14} /> Certificates
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="self-start rounded-2xl border-2 border-brand/20 bg-brand-light p-8 text-center">
+              <ShieldCheck className="mx-auto mb-3 text-brand" size={34} />
+              <p className="text-xs uppercase tracking-widest text-slate-500">
+                {certificateTypes.find((type) => type.value === form.certificateType)?.label}
+              </p>
+              <h2 className="mt-2 break-words text-2xl font-bold text-navy">
+                {form.title || "Certificate title"}
+              </h2>
+              <p className="mt-4 text-sm text-slate-500">This is to certify that</p>
+              <p className="mt-1 break-words text-xl font-semibold text-brand">
+                {form.studentName || "Student name"}
+              </p>
+              <p className="mt-3 text-sm text-slate-500">has completed</p>
+              <p className="break-words font-medium text-navy">
+                {form.course || "Degree / course"}
+              </p>
+              {form.grade && (
+                <p className="mt-1 text-sm text-slate-500">
+                  Grade / CGPA: {form.grade}
+                </p>
+              )}
+              <p className="mt-6 border-t border-brand/20 pt-4 text-xs text-slate-500">
+                Issue date: {form.issueDate || "—"}
+              </p>
+            </div>
           </div>
-        ) : (
-          <BulkIssuance />
+        )}
+
+        {activeTab === "bulk" && (
+          <div className="mx-auto max-w-3xl space-y-5 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-navy">CSV certificate batch</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Upload up to 50 records. Each certificate is independently validated and issued.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const csv = [
+                    "studentName,certificateNumber,certificateType,title,course,grade,issueDate,expiryDate",
+                    "Example Student,INST-2026-001,degree,Bachelor of Science,Computer Science,8.5,2026-06-01,",
+                  ].join("\r\n");
+                  const link = document.createElement("a");
+                  link.href = URL.createObjectURL(
+                    new Blob([csv], { type: "text/csv" }),
+                  );
+                  link.download = "certifyvault-certificates.csv";
+                  link.click();
+                  URL.revokeObjectURL(link.href);
+                }}
+                className="text-sm font-medium text-brand hover:underline"
+              >
+                Download CSV template
+              </button>
+            </div>
+
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 py-10 hover:border-brand/40 hover:bg-brand-light/30">
+              <UploadCloud size={30} className="text-brand" />
+              <span className="text-sm font-medium text-navy">
+                Choose a CSV file
+              </span>
+              <span className="text-xs text-slate-400">
+              Required columns: studentName, certificateType, title, course, issueDate; certificateNumber is optional
+              </span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                disabled={bulkBusy}
+                onChange={(event) => void handleCsv(event.target.files?.[0])}
+              />
+            </label>
+
+            {bulkError && (
+              <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+                {bulkError}
+              </p>
+            )}
+
+            {bulkRows.length > 0 && (
+              <>
+                <div className="flex items-center gap-3 rounded-xl bg-brand-light p-4">
+                  <FileSpreadsheet className="text-brand" size={20} />
+                  <p className="text-sm text-navy">
+                    {bulkRows.length} rows · {bulkRows.filter((row) => row.input).length} valid ·{" "}
+                    {bulkRows.filter((row) => !row.input).length} invalid
+                  </p>
+                </div>
+                <div className="max-h-80 overflow-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">CSV row</th>
+                        <th className="px-3 py-2">Student</th>
+                        <th className="px-3 py-2">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkRows.map((row) => (
+                        <tr key={row.line} className="border-t border-slate-100">
+                          <td className="px-3 py-2">{row.line}</td>
+                          <td className="px-3 py-2">
+                            {row.input?.studentName ?? "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {row.error ??
+                              row.resultError ??
+                              row.result?.status ??
+                              (bulkBusy ? "Waiting" : "Ready")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {bulkBusy && (
+                    <p className="text-sm text-slate-500">
+                      Processed {bulkProgress} of{" "}
+                      {bulkRows.filter((row) => row.input).length} records.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={
+                      bulkBusy ||
+                      !bulkRows.some((row) => row.input) ||
+                      bulkProgress > 0
+                    }
+                    onClick={() => void handleBulkIssue()}
+                    className="ml-auto flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand/90 disabled:opacity-50"
+                  >
+                    {bulkBusy && <Loader2 size={16} className="animate-spin" />}
+                    {bulkBusy ? "Issuing records…" : "Confirm valid rows"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setBulkRows([]);
+                setBulkProgress(0);
+                setBulkError("");
+              }}
+              disabled={bulkBusy}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-navy disabled:opacity-50"
+            >
+              <X size={14} /> Clear batch
+            </button>
+          </div>
         )}
       </div>
     </div>

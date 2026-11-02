@@ -1,91 +1,121 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import {
-  FileText, ShieldCheck, Hourglass, Ban, AlertTriangle,
+  AlertTriangle,
+  Ban,
+  FileText,
+  Hourglass,
+  ShieldCheck,
 } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-} from "recharts";
 import StatCard from "./StatCard";
+import {
+  getIssuerAuditLogs,
+  getIssuerCertificateStats,
+  type CertificateAuditRecord,
+  type IssuerCertificateStats,
+} from "../../../utils/certificateApi";
 
-const trendData = [
-  { date: "1 May", certificates: 40 },
-  { date: "8 May", certificates: 62 },
-  { date: "15 May", certificates: 55 },
-  { date: "22 May", certificates: 78 },
-  { date: "29 May", certificates: 70 },
-  { date: "5 Jun", certificates: 95 },
-];
-
-const recentActivity = [
-  { type: "issued", text: "Certificate CERT-2026-00521 issued to Aditi Rao", time: "12 min ago" },
-  { type: "verified", text: "Certificate CERT-2026-00498 verified by TCS", time: "40 min ago" },
-  { type: "pending", text: "Certificate request from Rohan Mehta", time: "1 hr ago" },
-  { type: "flagged", text: "Certificate CERT-2026-00490 flagged as suspicious", time: "3 hrs ago" },
-  { type: "revoked", text: "Certificate CERT-2026-00412 revoked", time: "1 day ago" },
-];
-
-const dotColor: Record<string, string> = {
-  issued: "bg-brand",
-  verified: "bg-emerald-500",
-  pending: "bg-amber-500",
-  flagged: "bg-orange-600",
-  revoked: "bg-rose-500",
-};
+const statCards = [
+  { key: "total", label: "Total certificates", icon: FileText },
+  { key: "issued", label: "Issued", icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50" },
+  { key: "pendingRegistration", label: "Pending registration", icon: Hourglass, color: "text-amber-600", bg: "bg-amber-50" },
+  { key: "failedRegistration", label: "Registration failed", icon: AlertTriangle, color: "text-rose-600", bg: "bg-rose-50" },
+  { key: "revoked", label: "Revoked", icon: Ban, color: "text-slate-600", bg: "bg-slate-100" },
+  { key: "issuedThisMonth", label: "Issued this month", icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
+] as const;
 
 export default function Overview() {
+  const { getToken } = useAuth();
+  const [stats, setStats] = useState<IssuerCertificateStats | null>(null);
+  const [auditLogs, setAuditLogs] = useState<CertificateAuditRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("Your secure session is unavailable.");
+        const [currentStats, logs] = await Promise.all([
+          getIssuerCertificateStats(token),
+          getIssuerAuditLogs(token),
+        ]);
+        if (active) {
+          setStats(currentStats);
+          setAuditLogs(logs);
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load issuer dashboard data.",
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [getToken]);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-navy">Overview</h1>
-        <p className="text-sm text-slate-500">Engineering College · This month</p>
+        <p className="text-sm text-slate-500">
+          Certificate activity for your institution
+        </p>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard icon={FileText} label="Total Certificates" value="1,248" change="12.5%" trend="up" />
-        <StatCard icon={FileText} label="Issued" value="312" change="9.1%" trend="up" iconBg="bg-blue-50" iconColor="text-blue-600" />
-        <StatCard icon={Hourglass} label="Pending" value="18" change="4.2%" trend="down" iconBg="bg-amber-50" iconColor="text-amber-600" />
-        <StatCard icon={ShieldCheck} label="Verified" value="982" change="18.2%" trend="up" iconBg="bg-emerald-50" iconColor="text-emerald-600" />
-        <StatCard icon={Ban} label="Revoked" value="12" change="2.1%" trend="down" iconBg="bg-rose-50" iconColor="text-rose-600" />
-        <StatCard icon={AlertTriangle} label="Suspicious" value="4" change="1.0%" trend="down" iconBg="bg-orange-50" iconColor="text-orange-600" />
+      {error && (
+        <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+          {error}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        {statCards.map((card) => (
+          <StatCard
+            key={card.key}
+            icon={card.icon}
+            label={card.label}
+            value={loading ? "—" : (stats?.[card.key] ?? 0)}
+            iconBg={"bg" in card ? card.bg : undefined}
+            iconColor={"color" in card ? card.color : undefined}
+          />
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Trend chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-semibold text-navy mb-4">Certificate Issuance Trend</h2>
-          <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={trendData}>
-              <defs>
-                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0050F5" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#0050F5" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EAF1FF" />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #EAF1FF", fontSize: 12 }} />
-              <Area type="monotone" dataKey="certificates" stroke="#0050F5" strokeWidth={2} fill="url(#trendFill)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Recent activity */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-semibold text-navy mb-4">Recent Activity</h2>
-          <ul className="space-y-4">
-            {recentActivity.map((item, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${dotColor[item.type]}`} />
-                <div className="text-sm">
-                  <p className="text-navy">{item.text}</p>
-                  <p className="text-xs text-slate-400">{item.time}</p>
-                </div>
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <h2 className="font-semibold text-navy">Recent certificate activity</h2>
+        {loading ? (
+          <p className="py-8 text-sm text-slate-400">Loading activity…</p>
+        ) : auditLogs.length === 0 ? (
+          <p className="py-8 text-sm text-slate-400">
+            No certificate activity has been recorded.
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-slate-100">
+            {auditLogs.map((log) => (
+              <li key={log.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-navy">
+                  <span className="font-medium">{log.action.replaceAll(".", " ")}</span>
+                  {log.certificateId && (
+                    <span className="ml-2 text-slate-500">{log.certificateId}</span>
+                  )}
+                </p>
+                <time className="text-xs text-slate-400">
+                  {new Date(log.createdAt).toLocaleString()}
+                </time>
               </li>
             ))}
           </ul>
-        </div>
-      </div>
+        )}
+      </section>
     </div>
   );
 }
