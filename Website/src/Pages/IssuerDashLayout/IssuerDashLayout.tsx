@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useClerk } from "@clerk/clerk-react";
 import {
   LayoutGrid,
   FileText,
@@ -75,12 +76,12 @@ export function TopNav() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
+  const { signOut } = useClerk();
 
   const handleLogout = () => setShowLogoutModal(true);
   const confirmLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = "/";
+    setShowLogoutModal(false);
+    void signOut({ redirectUrl: "/app/login" });
   };
   const cancelLogout = () => setShowLogoutModal(false);
 

@@ -13,6 +13,26 @@ const resultClasses: Record<string, string> = {
   Escalated: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
 };
 
+function exportAuditLogs() {
+  const rows = [
+    ["Action", "Target", "Actor", "Time", "IP", "Result"],
+    ...logs.map((log) => [log.action, log.user, log.actor, log.time, log.ip, log.result]),
+  ];
+  const csv = rows
+    .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","))
+    .join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = "certifyvault-audit-log.csv";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 export default function AdminAudit() {
   return (
     <div className="space-y-6" style={{ fontFamily: "'Figtree', sans-serif" }}>
@@ -24,7 +44,11 @@ export default function AdminAudit() {
             <p className="mt-2 text-sm text-slate-600">Review who changed what, when, and from which device or network.</p>
           </div>
           <div className="flex gap-2">
-            <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button
+              type="button"
+              onClick={exportAuditLogs}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
               <Download className="h-4 w-4" />
               Export
             </button>

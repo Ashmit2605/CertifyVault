@@ -1,4 +1,4 @@
-import { Activity, Blocks, CheckCircle2, Cpu, Database, ShieldCheck, TrendingUp } from "lucide-react";
+import { Activity, Blocks, CheckCircle2, Cpu, Database, ShieldCheck} from "lucide-react";
 
 const nodeStats = [
   { label: "Network health", value: "99.98%", icon: Activity, tone: "emerald" },

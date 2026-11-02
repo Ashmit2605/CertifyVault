@@ -1,5 +1,10 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { FileText, Download, Share2, Eye, CheckCircle, AlertTriangle } from 'lucide-react'
+import { FileText, Download, Eye, CheckCircle, AlertTriangle } from 'lucide-react'
+import { MOCK_SUSPICIOUS_RESULT, MOCK_VERIFIED_RESULT } from '../../data/verifierMockData'
+import type { VerificationResult as VResult } from '../../types/verifier'
+import VerificationResult from '../../Components/VerifierDashComponents/VerificationResult'
+import { downloadVerificationReport } from '../../utils/verificationReport'
 
 const reports = [
   { id: 'r1', title: 'B.Tech Certificate — Arjun Mehta',   id_: 'CV-2026-001245', status: 'verified' as const, score: 96, date: '12 Aug 2026' },
@@ -14,9 +19,17 @@ const statusConfig = {
 }
 
 export default function VerificationReports() {
+  const [selectedResult, setSelectedResult] = useState<VResult | null>(null)
+
+  const getDetailedResult = (certificateId: string) => {
+    if (certificateId === MOCK_VERIFIED_RESULT.certificate.id) return MOCK_VERIFIED_RESULT
+    if (certificateId === MOCK_SUSPICIOUS_RESULT.certificate.id) return MOCK_SUSPICIOUS_RESULT
+    return null
+  }
+
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--bg-2)' }}>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-screen" style={{ background: 'var(--bg-2)' }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
         <motion.div
           className="mb-8"
@@ -37,6 +50,7 @@ export default function VerificationReports() {
           {reports.map((report, i) => {
             const cfg = statusConfig[report.status]
             const StatusIcon = cfg.icon
+            const detailedResult = getDetailedResult(report.id_)
             return (
               <motion.div
                 key={report.id}
@@ -68,15 +82,28 @@ export default function VerificationReports() {
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>
                     {report.score}
                   </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'var(--light-blue)', color: 'var(--blue)' }} aria-label="View">
+                  <div className="flex items-center gap-1 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      disabled={!detailedResult}
+                      onClick={() => detailedResult && setSelectedResult(detailedResult)}
+                      title={detailedResult ? 'View detailed report' : 'Detailed result is not available in this demo'}
+                      className="w-7 h-7 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{ background: 'var(--light-blue)', color: 'var(--blue)' }}
+                      aria-label="View detailed report"
+                    >
                       <Eye size={13} strokeWidth={2} />
                     </button>
-                    <button className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg-3)', color: 'var(--navy)' }} aria-label="Download">
+                    <button
+                      type="button"
+                      disabled={!detailedResult}
+                      onClick={() => detailedResult && downloadVerificationReport(detailedResult)}
+                      title={detailedResult ? 'Download detailed report' : 'Detailed result is not available in this demo'}
+                      className="w-7 h-7 rounded-xl flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{ background: 'var(--bg-3)', color: 'var(--navy)' }}
+                      aria-label="Download detailed report"
+                    >
                       <Download size={13} strokeWidth={2} />
-                    </button>
-                    <button className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg-3)', color: 'var(--navy)' }} aria-label="Share">
-                      <Share2 size={13} strokeWidth={2} />
                     </button>
                   </div>
                 </div>
@@ -85,6 +112,22 @@ export default function VerificationReports() {
           })}
         </div>
       </div>
+      {selectedResult && (
+        <div
+          className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/50 p-4 sm:p-8"
+          onClick={() => setSelectedResult(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Verification report details"
+            className="mx-auto my-6 max-w-3xl rounded-3xl bg-white p-5 sm:p-8"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <VerificationResult result={selectedResult} onReset={() => setSelectedResult(null)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Activity, ArrowUpRight, Gauge, ServerCog, ShieldCheck, Zap } from "lucide-react";
+import { Activity, Gauge, ServerCog, Zap } from "lucide-react";
 
 const metrics = [
   { label: "Uptime", value: "99.98%", detail: "Last 30 days", tone: "emerald" },

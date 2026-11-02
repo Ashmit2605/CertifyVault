@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { useClerk } from "@clerk/clerk-react";
 import {
   ShieldCheck,
   Home,
@@ -16,7 +17,7 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
-import logo from "/logo1.png";
+import logo from "../../assets/Logo.webp";
 
 interface NavItem {
   title: string;
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
 ];
 
 export function TopNav() {
+  const { signOut } = useClerk();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
@@ -43,9 +45,8 @@ export function TopNav() {
     setShowLogoutModal(true);
   };
   const confirmLogout = (): void => {
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = "/";
+    setShowLogoutModal(false);
+    void signOut({ redirectUrl: "/app/login" });
   };
   const cancelLogout = (): void => setShowLogoutModal(false);
 
@@ -294,15 +295,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
 
 export function HolderDashboardLayout() {
   return (
-    <div
-      className="min-h-screen bg-gray-50"
-      style={{ fontFamily: "'Urbanist', sans-serif" }}
-    >
-      <link
-        href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
-      <style>{`* { font-family: 'Urbanist', sans-serif; }`}</style>
+    <div className="min-h-screen bg-gray-50">
       <TopNav />
       <main className="min-h-screen">
         <Outlet />

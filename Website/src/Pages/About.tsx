@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Shield, Target, Users, Zap, Lock, Brain,
+ Target, Users, Zap, Lock, Brain,
   GitBranch, CheckCircle2, ArrowRight, Globe,
   Building2, GraduationCap, Briefcase, Eye,
   FileCheck2, Heart, Lightbulb,

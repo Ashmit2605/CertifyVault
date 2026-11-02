@@ -3,7 +3,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { FileCheck2, Link as LinkIcon, Clock, CheckCircle2 } from "lucide-react";
+import { Link as LinkIcon, Clock, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "../../../Pages/IssuerDashLayout/IssuerDashLayout";
 
 /* ══════════════════════════════════════════════════════

@@ -7,25 +7,27 @@ import {
   CheckCircle2,
   Link2,
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { HOLDER_CERTIFICATES } from "../../data/holderMockData";
 
 const STATS = [
   {
     label: "Total Certificates",
-    value: "7",
+    value: String(HOLDER_CERTIFICATES.length),
     icon: FileCheck2,
     iconBg: "bg-[#EAF1FF]",
     iconColor: "text-[#0050F5]",
   },
   {
     label: "Verified",
-    value: "7",
+    value: String(HOLDER_CERTIFICATES.filter((certificate) => certificate.status === "Verified").length),
     icon: ShieldCheck,
     iconBg: "bg-[#E8F9EF]",
     iconColor: "text-[#1AAE5F]",
   },
   {
     label: "Revoked",
-    value: "0",
+    value: String(HOLDER_CERTIFICATES.filter((certificate) => certificate.status === "Revoked").length),
     icon: ShieldOff,
     iconBg: "bg-[#FDEDEE]",
     iconColor: "text-[#E5484D]",
@@ -57,6 +59,8 @@ const RECENT_ACTIVITY = [
 ];
 
 export default function Home() {
+  const recentCertificate = HOLDER_CERTIFICATES[0];
+
   return (
     <main className="mx-auto max-w-[1440px] px-6 py-8 lg:px-10">
         {/* Greeting */}
@@ -106,9 +110,9 @@ export default function Home() {
                 </span>
                 <div>
                   <h3 className="text-[18px] font-semibold text-[#000F3E]">
-                    B.E. Computer Engineering
+                    {recentCertificate.title}
                   </h3>
-                  <p className="text-[14px] text-[#6B7494]">PCCOER</p>
+                  <p className="text-[14px] text-[#6B7494]">{recentCertificate.issuer}</p>
                   <p className="mt-1 text-[13px] text-[#9AA3C2]">
                     Issued: 15 June 2026
                   </p>
@@ -119,14 +123,14 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex shrink-0 gap-3">
-                <button className="flex items-center gap-2 rounded-xl border border-[#DCE6FB] bg-white px-4 py-2.5 text-[13.5px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]">
+                <Link to="/holderdashboard/certificates" className="flex items-center gap-2 rounded-xl border border-[#DCE6FB] bg-white px-4 py-2.5 text-[13.5px] font-medium text-[#000F3E] no-underline hover:bg-[#F5F8FF]">
                   <Eye className="h-4 w-4" />
                   View
-                </button>
-                <button className="flex items-center gap-2 rounded-xl bg-[#0050F5] px-4 py-2.5 text-[13.5px] font-medium text-white hover:bg-[#0041CC]">
+                </Link>
+                <Link to="/holderdashboard/share" className="flex items-center gap-2 rounded-xl bg-[#0050F5] px-4 py-2.5 text-[13.5px] font-medium text-white no-underline hover:bg-[#0041CC]">
                   <Share2 className="h-4 w-4" />
                   Share
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -137,9 +141,9 @@ export default function Home() {
               <p className="text-[13px] font-semibold uppercase tracking-wide text-[#8993B4]">
                 Recent Activity
               </p>
-              <a href="#" className="text-[13px] font-medium text-[#0050F5]">
+              <Link to="/holderdashboard/activity" className="text-[13px] font-medium text-[#0050F5] no-underline">
                 View All
-              </a>
+              </Link>
             </div>
             <ul className="flex flex-col gap-4">
               {RECENT_ACTIVITY.map((a, i) => (

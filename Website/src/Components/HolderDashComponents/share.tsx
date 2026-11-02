@@ -7,23 +7,35 @@ import {
   ChevronRight,
   Check,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { useSearchParams } from "react-router-dom";
+import { HOLDER_CERTIFICATES } from "../../data/holderMockData";
 
 type ShareMode = "anyone" | "specific";
+type ShareStatus = "Active" | "Expired" | "Revoked";
 
-const ACTIVE_SHARES = [
+interface ShareRecord {
+  employer: string;
+  purpose: string;
+  created: string;
+  expires: string;
+  status: ShareStatus;
+}
+
+const ACTIVE_SHARES: ShareRecord[] = [
   {
     employer: "ABC Technologies",
     purpose: "Job Application",
     created: "12 Aug 2026",
     expires: "19 Aug 2026",
-    status: "Active" as const,
+    status: "Active",
   },
   {
     employer: "XYZ Corporation",
     purpose: "Background Verification",
     created: "1 Aug 2026",
     expires: "8 Aug 2026",
-    status: "Expired" as const,
+    status: "Expired",
   },
 ];
 
@@ -37,22 +49,41 @@ const DISCLOSURE_FIELDS = [
 ];
 
 export default function Share() {
+  const [searchParams] = useSearchParams();
+  const certificate = HOLDER_CERTIFICATES.find((item) => item.id === searchParams.get("certificate")) ?? HOLDER_CERTIFICATES[0];
   const [mode, setMode] = useState<ShareMode>("specific");
   const [expiry, setExpiry] = useState("7");
   const [linkGenerated, setLinkGenerated] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
+  const [showQr, setShowQr] = useState(false);
+  const [shares, setShares] = useState(ACTIVE_SHARES);
 
   const generatedLink = "certifyvault.com/share/8fK92xLq71QmP4";
+  const revokeShare = (employer: string) => {
+    setShares((current) => current.map((share) =>
+      share.employer === employer && share.status === "Active"
+        ? { ...share, status: "Revoked" }
+        : share,
+    ));
+  };
 
-  const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(`https://${generatedLink}`);
+      setCopyError("");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopyError("Clipboard access was denied. Select and copy the link manually.");
+      setCopied(false);
+    }
   };
 
   return (
     <main className="mx-auto max-w-[900px] px-6 py-8 lg:px-10">
         <p className="mb-5 flex items-center gap-1.5 text-[13px] text-[#8993B4]">
-          B.E. Computer Engineering <ChevronRight className="h-3.5 w-3.5" />
+          {certificate.title} <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-[#000F3E]">Share Certificate</span>
         </p>
 
@@ -60,7 +91,10 @@ export default function Share() {
           Share Certificate
         </h1>
         <p className="mb-7 text-[14px] text-[#6B7494]">
-          Generate a secure, verifiable link instead of sending a plain PDF.
+          Create a share-link preview instead of sending a plain PDF.
+        </p>
+        <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="note">
+        Demo mode: link expiry, access revocation, and recipient permissions need backend enforcement.
         </p>
 
         {/* Who are you sharing with */}
@@ -183,12 +217,12 @@ export default function Share() {
         ) : (
           <div className="mt-6 rounded-2xl border border-[#EAF1FF] bg-white p-7 shadow-[0_1px_2px_rgba(0,15,62,0.04)]">
             <p className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-[#8993B4]">
-              Secure Verification Link
+              Demo Verification Link
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="flex flex-1 items-center justify-between gap-3 rounded-xl bg-[#F7F9FF] px-4 py-3">
                 <span className="truncate text-[13.5px] font-medium text-[#000F3E]">
-                  {generatedLink}
+                  https://{generatedLink}
                 </span>
                 <button
                   onClick={handleCopy}
@@ -205,11 +239,21 @@ export default function Share() {
                   )}
                 </button>
               </div>
-              <button className="flex items-center justify-center gap-2 rounded-xl border border-[#DCE6FB] px-4 py-3 text-[13.5px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]">
+              <button
+                onClick={() => setShowQr((visible) => !visible)}
+                className="flex items-center justify-center gap-2 rounded-xl border border-[#DCE6FB] px-4 py-3 text-[13.5px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]"
+                aria-expanded={showQr}
+              >
                 <QrCode className="h-4 w-4 text-[#0050F5]" />
-                Generate QR
+                {showQr ? "Hide QR" : "Generate QR"}
               </button>
             </div>
+            {showQr && (
+              <div className="mt-5 flex justify-center rounded-xl border border-[#EAF1FF] bg-white p-5">
+                <QRCodeSVG value={`https://${generatedLink}`} size={180} level="M" includeMargin />
+              </div>
+            )}
+            {copyError && <p className="mt-3 text-sm text-red-600" role="alert">{copyError}</p>}
             <p className="mt-3 text-[12.5px] text-[#9AA3C2]">
               Expires {expiry === "1" ? "in 1 day" : `in ${expiry} days`} · CV-VERIFY-8A72K9
             </p>
@@ -222,7 +266,7 @@ export default function Share() {
             Active Shares
           </p>
           <div className="flex flex-col gap-3">
-            {ACTIVE_SHARES.map((s, i) => (
+            {shares.map((s, i) => (
               <div
                 key={i}
                 className="flex flex-col gap-3 rounded-2xl border border-[#EAF1FF] bg-white p-5 shadow-[0_1px_2px_rgba(0,15,62,0.04)] sm:flex-row sm:items-center sm:justify-between"
@@ -240,13 +284,18 @@ export default function Share() {
                     className={`rounded-full px-3 py-1 text-[12px] font-medium ${
                       s.status === "Active"
                         ? "bg-[#E8F9EF] text-[#1AAE5F]"
-                        : "bg-[#F0F3FC] text-[#9AA3C2]"
+                        : s.status === "Revoked"
+                          ? "bg-[#FDEDEE] text-[#E5484D]"
+                          : "bg-[#F0F3FC] text-[#9AA3C2]"
                     }`}
                   >
-                    {s.status === "Active" ? `Expires ${s.expires}` : "Expired"}
+                    {s.status === "Active" ? `Expires ${s.expires}` : s.status}
                   </span>
                   {s.status === "Active" && (
-                    <button className="flex items-center gap-1.5 rounded-lg border border-[#F6D6D7] px-3 py-1.5 text-[12.5px] font-medium text-[#E5484D] hover:bg-[#FDEDEE]">
+                    <button
+                      onClick={() => revokeShare(s.employer)}
+                      className="flex items-center gap-1.5 rounded-lg border border-[#F6D6D7] px-3 py-1.5 text-[12.5px] font-medium text-[#E5484D] hover:bg-[#FDEDEE]"
+                    >
                       <Ban className="h-3.5 w-3.5" />
                       Revoke Access
                     </button>

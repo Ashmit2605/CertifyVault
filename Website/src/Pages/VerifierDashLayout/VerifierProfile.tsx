@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useClerk } from '@clerk/clerk-react'
 import {
   User, ShieldCheck, KeyRound, LogOut,
   Upload, Trash2, Save, RotateCcw,
@@ -128,7 +128,7 @@ function ConfirmModal({ modal, onCancel, onConfirm }: {
 
 /* ── Main page ── */
 export default function VerifierProfile() {
-  const navigate = useNavigate()
+  const { signOut } = useClerk()
 
   const [activeTab, setActiveTab]       = useState<TabId>('profile')
   const [profile, setProfile]           = useState<ProfileSettings>(PROFILE_DEFAULTS)
@@ -180,7 +180,7 @@ export default function VerifierProfile() {
       if (fileInputRef.current) fileInputRef.current.value = ''
       showToast('Profile reset.', 'info')
     } else if (kind === 'logout') {
-      navigate('/app/login')
+      void signOut({ redirectUrl: '/app/login' })
     }
     setModal(null)
   }
@@ -191,8 +191,8 @@ export default function VerifierProfile() {
   ]
 
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-6">
+    <div className="min-h-screen" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
         {/* Header card */}
         <div className="rounded-3xl border bg-white p-6" style={{ borderColor: 'var(--bg-4)', boxShadow: '0 1px 4px rgba(0,15,62,0.05)' }}>

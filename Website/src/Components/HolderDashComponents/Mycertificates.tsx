@@ -1,88 +1,26 @@
 import { useState } from "react";
 import { Search, ShieldCheck, ShieldOff, Eye, Share2 } from "lucide-react";
-
-type Cert = {
-  id: string;
-  title: string;
-  issuer: string;
-  icon: string;
-  status: "Verified" | "Revoked";
-  issued: string;
-  type: string;
-};
-
-const CERTIFICATES: Cert[] = [
-  {
-    id: "CV-2026-001245",
-    title: "B.E. Computer Engineering",
-    issuer: "PCCOER",
-    icon: "🎓",
-    status: "Verified",
-    issued: "June 2026",
-    type: "Degree",
-  },
-  {
-    id: "CV-2026-000987",
-    title: "Internship Certificate",
-    issuer: "ABC Technologies",
-    icon: "💼",
-    status: "Verified",
-    issued: "May 2026",
-    type: "Internship",
-  },
-  {
-    id: "CV-2025-004521",
-    title: "Data Structures & Algorithms",
-    issuer: "NPTEL",
-    icon: "📘",
-    status: "Verified",
-    issued: "Dec 2025",
-    type: "Course",
-  },
-  {
-    id: "CV-2025-003310",
-    title: "Cloud Computing Fundamentals",
-    issuer: "AWS Academy",
-    icon: "☁️",
-    status: "Verified",
-    issued: "Oct 2025",
-    type: "Training",
-  },
-  {
-    id: "CV-2025-002187",
-    title: "Hackathon Winner — SIH 2025",
-    issuer: "Smart India Hackathon",
-    icon: "🏆",
-    status: "Verified",
-    issued: "Sep 2025",
-    type: "Other",
-  },
-  {
-    id: "CV-2024-009911",
-    title: "Web Development Bootcamp",
-    issuer: "XYZ Corp",
-    icon: "💻",
-    status: "Revoked",
-    issued: "Jan 2024",
-    type: "Training",
-  },
-];
+import { HOLDER_CERTIFICATES } from "../../data/holderMockData";
+import { Link } from "react-router-dom";
 
 const FILTERS = ["All", "Degree", "Course", "Internship", "Training", "Other"];
 
 export default function MyCertificates() {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
+  const [selectedCertificateId, setSelectedCertificateId] = useState<string | null>(null);
 
-  const filtered = CERTIFICATES.filter((c) => {
+  const filtered = HOLDER_CERTIFICATES.filter((c) => {
     const matchesFilter = filter === "All" || c.type === filter;
     const matchesQuery =
       c.title.toLowerCase().includes(query.toLowerCase()) ||
       c.issuer.toLowerCase().includes(query.toLowerCase());
     return matchesFilter && matchesQuery;
   });
+  const selectedCertificate = HOLDER_CERTIFICATES.find((certificate) => certificate.id === selectedCertificateId);
 
   return (
+    <>
     <main className="mx-auto max-w-[1440px] px-6 py-8 lg:px-10">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -90,7 +28,7 @@ export default function MyCertificates() {
               My Certificates
             </h1>
             <p className="mt-1 text-[14px] text-[#6B7494]">
-              Your digital credential wallet — {CERTIFICATES.length} credentials
+              Your digital credential wallet — {HOLDER_CERTIFICATES.length} credentials
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-[#E4EAFB] bg-white px-3.5 py-2.5 text-[#8993B4] sm:w-72">
@@ -162,19 +100,65 @@ export default function MyCertificates() {
                 <p className="text-[11.5px] text-[#B3BAD4]">{c.id}</p>
 
                 <div className="mt-5 flex gap-2.5 border-t border-[#F0F3FC] pt-4">
-                  <button className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCE6FB] py-2.5 text-[13px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]">
+                  <button
+                    onClick={() => setSelectedCertificateId(c.id)}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#DCE6FB] py-2.5 text-[13px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]"
+                  >
                     <Eye className="h-4 w-4" />
                     View
                   </button>
-                  <button className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0050F5] py-2.5 text-[13px] font-medium text-white hover:bg-[#0041CC]">
+                  <Link
+                    to={`/holderdashboard/share?certificate=${encodeURIComponent(c.id)}`}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0050F5] py-2.5 text-[13px] font-medium text-white no-underline hover:bg-[#0041CC]"
+                  >
                     <Share2 className="h-4 w-4" />
                     Share
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
         )}
       </main>
+      {selectedCertificate && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4"
+          onClick={() => setSelectedCertificateId(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="certificate-details-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="certificate-details-title" className="text-lg font-semibold text-[#000F3E]">
+                  Certificate details
+                </h2>
+                <p className="mt-1 text-sm text-[#6B7494]">{selectedCertificate.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCertificateId(null)}
+                className="rounded-lg px-3 py-1 text-sm text-[#4A5578] hover:bg-[#F5F8FF]"
+              >
+                Close
+              </button>
+            </div>
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <div><dt className="text-[#8993B4]">Certificate ID</dt><dd className="font-medium text-[#000F3E]">{selectedCertificate.id}</dd></div>
+              <div><dt className="text-[#8993B4]">Institution</dt><dd className="font-medium text-[#000F3E]">{selectedCertificate.issuer}</dd></div>
+              <div><dt className="text-[#8993B4]">Issued</dt><dd className="font-medium text-[#000F3E]">{selectedCertificate.issued}</dd></div>
+              <div><dt className="text-[#8993B4]">Status</dt><dd className="font-medium text-[#000F3E]">{selectedCertificate.status}</dd></div>
+            </dl>
+            <p className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Original certificate files are not included in this frontend demo.
+            </p>
+          </section>
+        </div>
+      )}
+    </>
   );
 }

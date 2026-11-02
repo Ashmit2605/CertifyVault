@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
@@ -25,33 +25,45 @@ export default function VerifierDashboard() {
   const [currentStep, setCurrentStep] = useState(0)
   const [result, setResult] = useState<VResult | null>(null)
   const [demoMode, setDemoMode] = useState<'verified' | 'suspicious'>('verified')
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  const clearTimers = () => {
+    timers.current.forEach(clearTimeout)
+    timers.current = []
+  }
+
+  useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
   const runVerification = () => {
+    clearTimers()
     setStage('processing')
     setCurrentStep(0)
 
     VERIFICATION_STEPS.forEach((_, i) => {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setCurrentStep(i)
         if (i === VERIFICATION_STEPS.length - 1) {
-          setTimeout(() => {
+          const resultTimer = setTimeout(() => {
             setResult(demoMode === 'verified' ? MOCK_VERIFIED_RESULT : MOCK_SUSPICIOUS_RESULT)
             setStage('result')
           }, 500)
+          timers.current.push(resultTimer)
         }
       }, i * 600)
+      timers.current.push(timer)
     })
   }
 
   const reset = () => {
+    clearTimers()
     setStage('idle')
     setCurrentStep(0)
     setResult(null)
   }
 
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-screen" style={{ background: 'var(--bg-2)', fontFamily: 'Figtree, system-ui, sans-serif' }}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
 
         {/* ── Hero greeting ── */}
         <motion.div
@@ -171,7 +183,7 @@ export default function VerifierDashboard() {
             <div className="flex items-center justify-between mb-4">
               <p className="font-bold text-sm" style={{ color: 'var(--navy)' }}>Recent Verifications</p>
               <Link
-                to="/app/verifier/history"
+                to="/verifierdashboard/history"
                 className="text-xs font-semibold no-underline flex items-center gap-1 transition-opacity"
                 style={{ color: 'var(--blue)' }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}

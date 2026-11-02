@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle, AlertTriangle, XCircle, ShieldCheck, Blocks, RotateCcw, Download, ExternalLink } from 'lucide-react'
 import TrustScore from './TrustScore'
 import type { VerificationResult as VResult } from '../../types/verifier'
+import { downloadVerificationReport } from '../../utils/verificationReport'
 
 interface Props {
   result: VResult
@@ -112,6 +113,13 @@ export default function VerificationResult({ result, onReset }: Props) {
         <button
           className="mt-4 flex items-center gap-1.5 text-xs font-semibold transition-opacity"
           style={{ color: 'var(--blue-4)' }}
+          onClick={() => {
+            if (result.blockchainProof.explorerUrl) {
+              window.open(result.blockchainProof.explorerUrl, '_blank', 'noopener,noreferrer')
+            }
+          }}
+          disabled={!result.blockchainProof.explorerUrl}
+          aria-disabled={!result.blockchainProof.explorerUrl}
           onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
           onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
         >
@@ -131,6 +139,7 @@ export default function VerificationResult({ result, onReset }: Props) {
           <RotateCcw size={14} /> Verify Another
         </button>
         <button
+          onClick={() => downloadVerificationReport(result)}
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm text-white transition-all"
           style={{ background: 'var(--blue)', boxShadow: '0 4px 12px rgba(0,80,245,0.2)' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--blue-2)' }}
