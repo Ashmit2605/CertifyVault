@@ -1,0 +1,2 @@
+ALTER TABLE "certificates" ADD COLUMN "bulk_import_document_id" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "certificates_bulk_import_document_unique" ON "certificates" USING btree ("bulk_import_document_id");

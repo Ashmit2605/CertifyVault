@@ -13,8 +13,11 @@ import { db } from "../db/index.js";
 import {
   certificateAuditLogs,
   certificates,
+  recipientRecords,
+  structuredCredentials,
   users,
 } from "../db/schema.js";
+import { createSignedAcademicCredential } from "./w3c-credential.service.js";
 import {
   getCertificateProofFromChain,
   getTransactionConfirmation,
@@ -42,6 +45,8 @@ export interface CertificateIssueInput {
   grade: string | null;
   issueDate: string;
   expiryDate: string | null;
+  recipientId?: number | null;
+  bulkImportDocumentId?: number;
 }
 
 function getErrorProperty(value: unknown, key: string): unknown {
@@ -154,6 +159,46 @@ function getVerificationUrl(certificateId: string, token: string) {
   return base.toString();
 }
 
+function getPublicCredentialUrl(certificateId: string) {
+  const configuredBase =
+    process.env.PUBLIC_CREDENTIAL_URL?.trim() ??
+    process.env.FRONTEND_URL?.split(",")[0]?.trim() ??
+    "http://localhost:5173";
+  let base: URL;
+  try {
+    base = new URL(configuredBase);
+  } catch {
+    throw new CertificateServiceError(
+      "PUBLIC_CREDENTIAL_URL must be an absolute URL.",
+      503,
+    );
+  }
+  if (
+    base.protocol !== "https:" &&
+    !(base.protocol === "http:" && base.hostname === "localhost")
+  ) {
+    throw new CertificateServiceError(
+      "PUBLIC_CREDENTIAL_URL must use HTTPS outside localhost.",
+      503,
+    );
+  }
+  if (
+    base.search ||
+    base.hash ||
+    base.username ||
+    base.password ||
+    base.pathname !== "/"
+  ) {
+    throw new CertificateServiceError(
+      "PUBLIC_CREDENTIAL_URL must be a website origin without credentials, a path, a query, or a fragment.",
+      503,
+    );
+  }
+
+  base.pathname = `${base.pathname.replace(/\/+$/, "")}/credentials/${encodeURIComponent(certificateId)}`;
+  return base.toString();
+}
+
 async function writeAudit(
   actorId: number,
   certificateRowId: number,
@@ -171,7 +216,10 @@ async function writeAudit(
 function certificateResponse(certificate: typeof certificates.$inferSelect) {
   const { storageKey, ...publicFields } = certificate;
   void storageKey;
-  return publicFields;
+  return {
+    ...publicFields,
+    verificationUrl: getPublicCredentialUrl(certificate.certificateId),
+  };
 }
 
 async function runRegistration(
@@ -273,6 +321,30 @@ export async function issueCertificate(
       403,
     );
   }
+  if (input.recipientId) {
+    const [recipient] = await db
+      .select()
+      .from(recipientRecords)
+      .where(
+        and(
+          eq(recipientRecords.id, input.recipientId),
+          eq(recipientRecords.issuerId, issuer.id),
+        ),
+      )
+      .limit(1);
+    if (!recipient) {
+      throw new CertificateServiceError("Recipient record not found.", 404);
+    }
+    if (
+      recipient.recipientName.trim().toLocaleLowerCase() !==
+      input.studentName.trim().toLocaleLowerCase()
+    ) {
+      throw new CertificateServiceError(
+        "Certificate recipient name must match the approved recipient record.",
+        400,
+      );
+    }
+  }
   const certificateId = createCertificateId();
   let token: string;
   try {
@@ -285,6 +357,7 @@ export async function issueCertificate(
     );
   }
   const verificationUrl = getVerificationUrl(certificateId, token);
+  const publicCredentialUrl = getPublicCredentialUrl(certificateId);
   const issueDate = input.issueDate;
   const pdf = await renderCertificatePdf({
     certificateId,
@@ -297,9 +370,23 @@ export async function issueCertificate(
     issueDate,
     institutionName,
     issuerName: `${issuer.firstName} ${issuer.lastName}`,
-    verificationUrl,
+    verificationUrl: publicCredentialUrl,
   });
   const certificateHash = createHash("sha256").update(pdf).digest("hex");
+  const signedCredential = await createSignedAcademicCredential({
+    issuerId: issuer.id,
+    issuerName: institutionName,
+    certificateId,
+    certificateNumber: input.certificateNumber,
+    certificateType: input.certificateType,
+    title: input.title,
+    studentName: input.studentName,
+    course: input.course,
+    grade: input.grade,
+    issueDate,
+    expiryDate: input.expiryDate,
+    certificateHash,
+  });
   const storageKey = `certificates/${certificateId}.pdf`;
 
   await storeCertificatePdf(storageKey, pdf);
@@ -311,8 +398,10 @@ export async function issueCertificate(
         .insert(certificates)
         .values({
           certificateId,
+          bulkImportDocumentId: input.bulkImportDocumentId ?? null,
           certificateNumber: input.certificateNumber,
           issuerId: issuer.id,
+          recipientId: input.recipientId ?? null,
           studentName: input.studentName,
           course: input.course,
           certificateType: input.certificateType,
@@ -335,6 +424,12 @@ export async function issueCertificate(
       if (!created) {
         throw new Error("Certificate could not be created.");
       }
+      await transaction.insert(structuredCredentials).values({
+        certificateRowId: created.id,
+        credentialJson: signedCredential.credential,
+        credentialDigest: signedCredential.credentialDigest,
+        proofKeyId: signedCredential.proofKeyId,
+      });
       await transaction.insert(certificateAuditLogs).values({
         actorId: issuer.id,
         certificateRowId: created.id,
