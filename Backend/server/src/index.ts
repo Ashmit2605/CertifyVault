@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth.routes.js";
 import blockchainRoutes from "./routes/blockchain.routes.js";
 import certificateRoutes from "./routes/certificate.routes.js";
 import issuerRoutes from "./routes/issuer.routes.js";
+import settingsRoutes from "./routes/settings.routes.js";
 import verificationRoutes from "./routes/verification.routes.js";
 
 const app = express();
@@ -49,6 +50,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/certificates", certificateRoutes);
 app.use("/api/issuer", issuerRoutes);
+app.use("/api/settings", settingsRoutes);
 app.use("/api/blockchain", blockchainRoutes);
 app.use("/api/verification", verificationRoutes);
 
@@ -61,6 +63,19 @@ app.use(
   ) => {
     if (res.headersSent) {
       next(error);
+      return;
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      error.status === 413
+    ) {
+      res.status(413).json({
+        success: false,
+        message: "Profile images must be 4MB or smaller.",
+      });
       return;
     }
 

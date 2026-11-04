@@ -41,6 +41,18 @@ const COLORS = {
   redSoft: "#FDECEC",
 };
 
+/**
+ * Shared desktop layout metrics.
+ * The header (logo / Log out / nav) and <main> use the SAME max width and the
+ * SAME horizontal gutter, so the logo's left edge and the Log out button's
+ * right edge line up exactly with the dashboard content between them.
+ */
+const CONTENT_MAX_WIDTH = 1440;
+const HEADER_GUTTER = 40;
+// Desktop header spans the full viewport: logo hugs the top-left corner and
+// Log out hugs the top-right corner, with the centered dashboard between them.
+const HEADER_EDGE = 24;
+
 interface NavItem {
   key: string;
   label: string;
@@ -560,56 +572,60 @@ function Sidebar({ activeKey, onNavigate, onLogoutClick }: SidebarProps) {
         top: 0,
         zIndex: 40,
         width: "100%",
+        boxSizing: "border-box",
         background: COLORS.white,
         borderBottom: `1px solid ${COLORS.line}`,
       }}
     >
+      {/* Single row: logo (left corner) → nav items (middle) → Log out (right corner) */}
       <div
         style={{
-          maxWidth: 1440,
-          minHeight: 64,
-          margin: "0 auto",
-          padding: "10px 24px",
+          boxSizing: "border-box",
+          width: "100%",
+          minHeight: 80,
+          margin: 0,
+          padding: `18px ${HEADER_EDGE}px`,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
+          gap: 20,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <img src={logo2} alt="CertifyVault" style={{ width: 38, height: 38, objectFit: "contain" }} />
           <div>
-            <div style={{ color: COLORS.navy, fontSize: 17, fontWeight: 800, lineHeight: 1.1 }}>
+            <div style={{ color: COLORS.navy, fontSize: 17, fontWeight: 800, lineHeight: 1.1, whiteSpace: "nowrap" }}>
               Certify<span style={{ color: COLORS.blue }}>Vault</span>
             </div>
-            <div style={{ color: COLORS.textDim, fontSize: 11, fontWeight: 600, marginTop: 3 }}>
+            <div style={{ color: COLORS.textDim, fontSize: 11, fontWeight: 600, marginTop: 3, whiteSpace: "nowrap" }}>
               Platform Administrator
             </div>
           </div>
         </div>
+
+        <nav
+          aria-label="Administrator navigation"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4,
+            overflowX: "auto",
+          }}
+        >
+          {NAV_ITEMS.map((item) => (
+            <RailButton
+              key={item.key}
+              item={item}
+              active={activeKey === item.key}
+              onClick={() => onNavigate(item)}
+            />
+          ))}
+        </nav>
+
         <LogoutRailButton onClick={onLogoutClick} />
       </div>
-      <nav
-        aria-label="Administrator navigation"
-        style={{
-          maxWidth: 1440,
-          margin: "0 auto",
-          padding: "0 24px 8px",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          overflowX: "auto",
-        }}
-      >
-        {NAV_ITEMS.map((item) => (
-          <RailButton
-            key={item.key}
-            item={item}
-            active={activeKey === item.key}
-            onClick={() => onNavigate(item)}
-          />
-        ))}
-      </nav>
     </header>
   );
 }
@@ -725,10 +741,11 @@ export default function AdminDashLayout() {
 
       <main
         style={{
+          boxSizing: "border-box",
           width: "100%",
-          maxWidth: 1440,
+          maxWidth: CONTENT_MAX_WIDTH,
           margin: "0 auto",
-          padding: isMobile ? "20px 16px 32px" : "28px 40px 50px",
+          padding: isMobile ? "20px 16px 32px" : `28px ${HEADER_GUTTER}px 50px`,
           background: COLORS.mainBg,
           flex: 1,
           minWidth: 0,

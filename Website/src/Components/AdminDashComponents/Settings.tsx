@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
+import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import {
-  Settings,
-  User,
   Save,
   RotateCcw,
   CheckCircle,
@@ -15,28 +14,17 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import {
+  getAdminSettings,
+  removeAdminAvatar,
+  revokeAdminSessions,
+  updateAdminProfile,
+  uploadAdminAvatar,
+} from '../../utils/settingsApi';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
-
-type TabId = 'general' | 'profile';
-
-interface TabConfig {
-  id: TabId;
-  label: string;
-  icon: LucideIcon;
-}
-
-interface GeneralSettings {
-  institutionName: string;
-  platformDescription: string;
-  supportEmail: string;
-  certificateValidity: string;
-  certificateIdPrefix: string;
-  dateTimeFormat: string;
-  defaultLanguage: string;
-}
 
 interface ProfileSettings {
   fullName: string;
@@ -51,32 +39,15 @@ interface ToastMessage {
   text: string;
 }
 
-type ModalKind = 'save' | 'reset' | 'password' | 'logout';
-type SettingsSection = 'general' | 'profile' | 'password';
+type ModalKind = 'save' | 'reset' | 'logout';
+type SettingsSection = 'profile' | 'password';
 
 interface ModalState {
   kind: ModalKind;
   section: SettingsSection;
 }
 
-const GENERAL_DEFAULTS: GeneralSettings = {
-  institutionName: 'Credential Vault Platform',
-  platformDescription: 'Secure certificate verification and blockchain integration system',
-  supportEmail: 'support@vault.io',
-  certificateValidity: '365',
-  certificateIdPrefix: 'CERT-',
-  dateTimeFormat: 'DD/MM/YYYY HH:mm',
-  defaultLanguage: 'English',
-};
-
-const PROFILE_DEFAULTS: ProfileSettings = {
-  fullName: 'Sarah Johnson',
-  email: 'sarah.johnson@vault.io',
-  role: 'Platform Administrator',
-};
-
 const SECTION_LABEL: Record<SettingsSection, string> = {
-  general: 'general',
   profile: 'profile',
   password: 'password',
 };
@@ -86,23 +57,54 @@ const SECTION_LABEL: Record<SettingsSection, string> = {
 /* ------------------------------------------------------------------ */
 
 export default function AdminSettingsPage(): ReactElement {
-  const [activeTab, setActiveTab] = useState<TabId>('general');
+  const { getToken } = useAuth();
+  const { openUserProfile, signOut } = useClerk();
+  const { user } = useUser();
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
 
-  const [general, setGeneral] = useState<GeneralSettings>(GENERAL_DEFAULTS);
-  const [profile, setProfile] = useState<ProfileSettings>(PROFILE_DEFAULTS);
+  const [profile, setProfile] = useState<ProfileSettings>({ fullName: '', email: '', role: '' });
 
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(true);
-  const [pwPanelOpen, setPwPanelOpen] = useState<boolean>(false);
-  const [pwCurrent, setPwCurrent] = useState<string>('');
-  const [pwNew, setPwNew] = useState<string>('');
-  const [pwConfirm, setPwConfirm] = useState<string>('');
+  const [storedTwoFactorEnabled, setStoredTwoFactorEnabled] = useState<boolean>(false);
+  const twoFactorEnabled = user?.twoFactorEnabled ?? storedTwoFactorEnabled;
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Unable to establish a secure session.');
+        const settings = await getAdminSettings(token);
+        if (!active) return;
+        setProfile({
+          fullName: settings.fullName,
+          email: settings.email,
+          role: settings.role,
+        });
+        setAvatarSrc(settings.avatarData);
+        setStoredTwoFactorEnabled(settings.twoFactorEnabled);
+      } catch (loadError) {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load account settings.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [getToken]);
 
   useEffect(() => {
     return () => {
@@ -129,14 +131,51 @@ export default function AdminSettingsPage(): ReactElement {
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setAvatarSrc(reader.result as string);
-    reader.readAsDataURL(file);
+    void (async () => {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setError('Upload a JPG, PNG, or WEBP image.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+      if (file.size > 4 * 1024 * 1024) {
+        setError('Profile photos must be 4MB or smaller.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
+      setSaving(true);
+      setError('');
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Unable to establish a secure session.');
+        setAvatarSrc(await uploadAdminAvatar(token, file));
+        showToast('Profile photo updated.');
+      } catch (uploadError) {
+        setError(uploadError instanceof Error ? uploadError.message : 'Unable to save your profile photo.');
+      } finally {
+        setSaving(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    })();
   };
 
   const removeAvatar = (): void => {
-    setAvatarSrc(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    void (async () => {
+      setSaving(true);
+      setError('');
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Unable to establish a secure session.');
+        await removeAdminAvatar(token);
+        setAvatarSrc(null);
+        showToast('Profile photo removed.');
+      } catch (removeError) {
+        setError(removeError instanceof Error ? removeError.message : 'Unable to remove your profile photo.');
+      } finally {
+        setSaving(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    })();
   };
 
   const openModal = (kind: ModalKind, section: SettingsSection): void =>
@@ -145,378 +184,252 @@ export default function AdminSettingsPage(): ReactElement {
   const closeModal = (): void => setModal(null);
 
   const confirmModal = (): void => {
-    if (!modal) return;
+    if (!modal || saving) return;
     const { kind, section } = modal;
 
-    if (kind === 'save') {
-      if (section === 'password') {
-        setPwCurrent('');
-        setPwNew('');
-        setPwConfirm('');
-        setPwPanelOpen(false);
-        showToast('Password updated.', 'success');
-      } else {
-        showToast('Your changes have been saved.', 'success');
-      }
-    } else if (kind === 'reset') {
-      if (section === 'general') setGeneral(GENERAL_DEFAULTS);
-      if (section === 'profile') setProfile(PROFILE_DEFAULTS);
-      showToast(
-        `${SECTION_LABEL[section].charAt(0).toUpperCase()}${SECTION_LABEL[section].slice(1)} settings reset.`,
-        'info',
-      );
-    } else if (kind === 'logout') {
-      showToast('You’ve been logged out of all other devices.', 'success');
-    }
+    void (async () => {
+      setSaving(true);
+      setError('');
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Unable to establish a secure session.');
 
-    setModal(null);
+        if (kind === 'save') {
+          const updated = await updateAdminProfile(token, profile.fullName);
+          setProfile({
+            fullName: updated.fullName,
+            email: updated.email,
+            role: updated.role,
+          });
+          setAvatarSrc(updated.avatarData);
+          showToast('Your changes have been saved.');
+        } else if (kind === 'reset') {
+          const saved = await getAdminSettings(token);
+          setProfile({ fullName: saved.fullName, email: saved.email, role: saved.role });
+          setAvatarSrc(saved.avatarData);
+          setStoredTwoFactorEnabled(saved.twoFactorEnabled);
+          showToast(
+            `${SECTION_LABEL[section].charAt(0).toUpperCase()}${SECTION_LABEL[section].slice(1)} settings reset.`,
+            'info',
+          );
+        } else {
+          await revokeAdminSessions(token);
+          await signOut({ redirectUrl: '/app/login' });
+          return;
+        }
+        setModal(null);
+      } catch (actionError) {
+        setError(actionError instanceof Error ? actionError.message : 'Unable to update account settings.');
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
-  const tabs: TabConfig[] = [
-    { id: 'general', label: 'General', icon: Settings },
-    { id: 'profile', label: 'Profile', icon: User },
-  ];
+  const roleLabel = profile.role === 'admin'
+    ? 'Platform Administrator'
+    : profile.role.charAt(0).toUpperCase() + profile.role.slice(1);
 
+  /*
+   * Single-view layout (desktop, lg+):
+   * The page is sized to the visible viewport — 10.5rem accounts for the
+   * sticky admin header (~81px) plus the layout's top/bottom padding (~78px).
+   * Cards share the remaining height; the security card scrolls internally
+   * only if security settings expand on a short screen.
+   * On smaller screens the sections simply stack and the page scrolls.
+   */
   return (
-    <div className="space-y-6" style={{ fontFamily: "'Figtree', sans-serif" }}>
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+    <div
+      className="flex flex-col gap-4 lg:h-[calc(100vh-10.5rem)] lg:min-h-[500px]"
+      style={{ fontFamily: "'Figtree', sans-serif" }}
+    >
+      {/* Page header (toast appears inline on the right so nothing shifts) */}
+      <div className="shrink-0 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm shadow-slate-200/50">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">Settings</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Account settings</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Manage your platform details, profile information, and administrator preferences.
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Account settings</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Manage your profile information and administrator account security.
             </p>
           </div>
+
+          {toast && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 shadow-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                {toast.text}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {toast && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            {toast.text}
-          </div>
+      {modal && (
+        <ConfirmationModal
+          modal={modal}
+          saving={saving}
+          onCancel={closeModal}
+          onConfirm={confirmModal}
+        />
+      )}
+
+      {error && (
+        <div role="alert" className="shrink-0 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
         </div>
       )}
 
-      {modal && <ConfirmationModal modal={modal} onCancel={closeModal} onConfirm={confirmModal} />}
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/50">
-        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${active ? 'bg-white text-sky-700 shadow-sm ring-1 ring-sky-100' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {activeTab === 'general' && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-            <div className="mb-5">
-              <h3 className="text-lg font-semibold text-slate-900">Platform details</h3>
-              <p className="mt-1 text-sm text-slate-500">Shown to users on certificates and verification pages.</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Field label="Institution / platform name">
-                <input
-                  type="text"
-                  value={general.institutionName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setGeneral({ ...general, institutionName: e.target.value })
-                  }
-                  className="field-input"
-                />
-              </Field>
-
-              <Field label="Support email">
-                <input
-                  type="email"
-                  value={general.supportEmail}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setGeneral({ ...general, supportEmail: e.target.value })
-                  }
-                  className="field-input"
-                />
-              </Field>
-            </div>
-
-            <Field label="Platform description">
-              <textarea
-                value={general.platformDescription}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                  setGeneral({ ...general, platformDescription: e.target.value })
-                }
-                rows={3}
-                className="field-input min-h-[78px] resize-y"
-              />
-            </Field>
-
-            <hr className="my-6 border-t border-slate-200" />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Field label="Default certificate validity (days)">
-                <input
-                  type="number"
-                  value={general.certificateValidity}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setGeneral({ ...general, certificateValidity: e.target.value })
-                  }
-                  className="field-input"
-                />
-              </Field>
-
-              <Field label="Certificate ID prefix" hint="Example: CERT-20260815001">
-                <input
-                  type="text"
-                  value={general.certificateIdPrefix}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setGeneral({ ...general, certificateIdPrefix: e.target.value })
-                  }
-                  className="field-input"
-                />
-              </Field>
-
-              <Field label="Date & time format">
-                <select
-                  value={general.dateTimeFormat}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setGeneral({ ...general, dateTimeFormat: e.target.value })
-                  }
-                  className="field-input"
-                >
-                  <option>DD/MM/YYYY HH:mm</option>
-                  <option>MM/DD/YYYY HH:mm</option>
-                  <option>YYYY-MM-DD HH:mm</option>
-                </select>
-              </Field>
-
-              <Field label="Default language">
-                <select
-                  value={general.defaultLanguage}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    setGeneral({ ...general, defaultLanguage: e.target.value })
-                  }
-                  className="field-input"
-                >
-                  <option>English</option>
-                  <option>Spanish</option>
-                  <option>French</option>
-                  <option>German</option>
-                  <option>Chinese</option>
-                </select>
-              </Field>
-            </div>
-
-            <div className="mt-6 flex gap-2.5 border-t border-slate-200 pt-5">
-              <button onClick={() => openModal('save', 'general')} className="btn-primary">
-                <Save className="h-3.75 w-3.75" />
-                Save changes
-              </button>
-              <button onClick={() => openModal('reset', 'general')} className="btn-ghost">
-                <RotateCcw className="h-3.75 w-3.75" />
-                Reset
-              </button>
-            </div>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* ---------------- Left: Profile ---------------- */}
+        <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 lg:col-span-3">
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-slate-900">Your profile</h3>
+            <p className="mt-0.5 text-sm text-slate-500">This is how you appear across the admin console.</p>
           </div>
-        )}
 
-        {activeTab === 'profile' && (
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-              <div className="mb-5">
-                <h3 className="text-lg font-semibold text-slate-900">Your profile</h3>
-                <p className="mt-1 text-sm text-slate-500">This is how you appear across the admin console.</p>
-              </div>
-
-              <div className="mb-6 flex items-center gap-5">
-                <div
-                  className="flex h-19 w-19 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sky-600 text-2xl font-bold text-white shadow-[0_4px_16px_-4px_rgba(0,80,245,0.45)]"
-                  style={{ background: 'linear-gradient(155deg,#0050F5,#0040C4)' }}
-                >
-                  {avatarSrc ? (
-                    <img src={avatarSrc} alt="Profile photo" className="h-full w-full object-cover" />
-                  ) : (
-                    initials(profile.fullName)
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <div className="flex gap-2.5">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-2 text-[13px] font-semibold text-sky-700 transition-colors hover:bg-sky-100"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      Upload photo
-                    </button>
-                    <button
-                      onClick={removeAvatar}
-                      className="inline-flex items-center gap-1.5 px-1.5 py-2 text-[13px] font-semibold text-slate-500 transition-colors hover:text-rose-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Remove
-                    </button>
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png, image/jpeg, image/webp"
-                    className="hidden"
-                    onChange={handleAvatarUpload}
-                  />
-                  <span className="text-xs text-slate-400">JPG, PNG or WEBP. Max 4MB.</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Field label="Full name">
-                  <input
-                    type="text"
-                    value={profile.fullName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setProfile({ ...profile, fullName: e.target.value })
-                    }
-                    className="field-input"
-                  />
-                </Field>
-                <Field label="Email">
-                  <input
-                    type="email"
-                    value={profile.email}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setProfile({ ...profile, email: e.target.value })
-                    }
-                    className="field-input"
-                  />
-                </Field>
-              </div>
-
-              <div className="mb-1">
-                <label className="mb-1.5 block text-[13px] font-semibold">Role</label>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold tracking-wide text-sky-700">
-                  {profile.role}
-                </span>
-              </div>
-
-              <div className="mt-6 flex gap-2.5 border-t border-slate-200 pt-5">
-                <button onClick={() => openModal('save', 'profile')} className="btn-primary">
-                  <Save className="h-3.75 w-3.75" />
-                  Save changes
-                </button>
-                <button onClick={() => openModal('reset', 'profile')} className="btn-ghost">
-                  <RotateCcw className="h-3.75 w-3.75" />
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-              <div className="mb-5">
-                <h3 className="text-lg font-semibold text-slate-900">Account security</h3>
-                <p className="mt-1 text-sm text-slate-500">Basic protections for your administrator account.</p>
-              </div>
-
-              <SecurityRow
-                icon={ShieldCheck}
-                title="Two-factor authentication"
-                subtitle={twoFactorEnabled ? 'Enabled · last updated 3 days ago' : 'Not enabled'}
-                right={
-                  <button
-                    onClick={() => setTwoFactorEnabled((v) => !v)}
-                    aria-pressed={twoFactorEnabled}
-                    className="relative h-6 w-10 shrink-0 rounded-full transition-colors"
-                    style={{ backgroundColor: twoFactorEnabled ? '#0050F5' : '#D5DAE3' }}
-                  >
-                    <span
-                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${twoFactorEnabled ? 'translate-x-4' : ''
-                        }`}
-                    />
-                  </button>
-                }
-              />
-
-              <button className="w-full text-left" onClick={() => setPwPanelOpen((v) => !v)}>
-                <SecurityRow
-                  icon={KeyRound}
-                  title="Password"
-                  subtitle="Last changed 45 days ago"
-                  right={<span className="text-[13px] font-semibold text-sky-700">Change</span>}
-                />
-              </button>
-
-              {pwPanelOpen && (
-                <div className="pt-4">
-                  <Field label="Current password">
-                    <input
-                      type="password"
-                      value={pwCurrent}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPwCurrent(e.target.value)}
-                      placeholder="••••••••"
-                      className="field-input"
-                    />
-                  </Field>
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <Field label="New password">
-                      <input
-                        type="password"
-                        value={pwNew}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPwNew(e.target.value)}
-                        placeholder="••••••••"
-                        className="field-input"
-                      />
-                    </Field>
-                    <Field label="Confirm new password">
-                      <input
-                        type="password"
-                        value={pwConfirm}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPwConfirm(e.target.value)}
-                        placeholder="••••••••"
-                        className="field-input"
-                      />
-                    </Field>
-                  </div>
-                  <button onClick={() => openModal('save', 'password')} className="btn-primary mb-1">
-                    Update password
-                  </button>
-                </div>
+          <div className="mb-5 flex items-center gap-4">
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sky-600 text-xl font-bold text-white shadow-[0_4px_16px_-4px_rgba(0,80,245,0.45)]"
+              style={{ background: 'linear-gradient(155deg,#0050F5,#0040C4)' }}
+            >
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="Profile photo" className="h-full w-full object-cover" />
+              ) : (
+                initials(profile.fullName)
               )}
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-              <div className="flex items-center justify-between gap-3.5 rounded-xl border border-rose-200 bg-rose-50 p-4">
-                <div className="flex flex-1 items-center gap-3">
-                  <div className="flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white">
-                    <LogOut className="h-4 w-4 text-rose-600" />
-                  </div>
-                  <div>
-                    <p className="m-0 text-[13.5px] font-semibold text-rose-700">Log out of all devices</p>
-                    <span className="text-xs text-rose-600">Ends every active session, including this one</span>
-                  </div>
-                </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex gap-2.5">
                 <button
-                  onClick={() => openModal('logout', 'profile')}
-                  className="rounded-lg border border-rose-200 bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-rose-600 transition-colors hover:bg-rose-50"
+                  type="button"
+                  disabled={saving || loading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-2 text-[13px] font-semibold text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-50"
                 >
-                  Log out all
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload photo
+                </button>
+                <button
+                  type="button"
+                  disabled={saving || loading || !avatarSrc}
+                  onClick={removeAvatar}
+                  className="inline-flex items-center gap-1.5 px-1.5 py-2 text-[13px] font-semibold text-slate-500 transition-colors hover:text-rose-600 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remove
                 </button>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+              <span className="text-xs text-slate-400">JPG, PNG or WEBP. Max 4MB.</span>
             </div>
           </div>
-        )}
+
+          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+            <Field label="Full name">
+              <input
+                type="text"
+                value={profile.fullName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfile({ ...profile, fullName: e.target.value })}
+                className="field-input"
+                disabled={loading || saving}
+              />
+            </Field>
+            <Field label="Email">
+              <input
+                type="email"
+                value={profile.email}
+                readOnly
+                className="field-input cursor-not-allowed bg-slate-50"
+              />
+              <p className="mt-1.5 text-xs text-slate-400">
+                Email changes require verification.{' '}
+                <button type="button" onClick={() => openUserProfile()} className="font-semibold text-sky-700">
+                  Manage email
+                </button>
+              </p>
+            </Field>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[13px] font-semibold">Role</label>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold tracking-wide text-sky-700">
+              {roleLabel}
+            </span>
+          </div>
+
+          <div className="mt-auto flex gap-2.5 border-t border-slate-200 pt-4">
+            <button onClick={() => openModal('save', 'profile')} className="btn-primary" disabled={loading || saving}>
+              <Save className="h-3.75 w-3.75" />
+              Save changes
+            </button>
+            <button onClick={() => openModal('reset', 'profile')} className="btn-ghost" disabled={loading || saving}>
+              <RotateCcw className="h-3.75 w-3.75" />
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {/* ---------------- Right: Security + Logout all ---------------- */}
+        <div className="flex min-h-0 flex-col gap-4 lg:col-span-2">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-slate-900">Account security</h3>
+              <p className="mt-0.5 text-sm text-slate-500">Basic protections for your administrator account.</p>
+            </div>
+
+            <SecurityRow
+              icon={ShieldCheck}
+              title="Two-factor authentication"
+              subtitle={twoFactorEnabled ? 'Enabled on your account' : 'Not enabled'}
+              right={
+                <button
+                  type="button"
+                  onClick={() => openUserProfile()}
+                  className="shrink-0 text-[13px] font-semibold text-sky-700"
+                >
+                  Manage
+                </button>
+              }
+            />
+
+            <button type="button" className="w-full text-left" onClick={() => openUserProfile()}>
+              <SecurityRow
+                icon={KeyRound}
+                title="Password"
+                subtitle="Manage your password securely"
+                right={<span className="text-[13px] font-semibold text-sky-700">Manage</span>}
+              />
+            </button>
+          </div>
+
+          <div className="shrink-0 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/50">
+            <div className="flex items-center justify-between gap-3.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5">
+              <div className="flex flex-1 items-center gap-3">
+                <div className="flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white">
+                  <LogOut className="h-4 w-4 text-rose-600" />
+                </div>
+                <div>
+                  <p className="m-0 text-[13.5px] font-semibold text-rose-700">Log out of all devices</p>
+                  <span className="text-xs text-rose-600">Ends every active session, including this one</span>
+                </div>
+              </div>
+              <button
+                onClick={() => openModal('logout', 'profile')}
+                className="shrink-0 rounded-lg border border-rose-200 bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-rose-600 transition-colors hover:bg-rose-50"
+              >
+                Log out all
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <style>{`
@@ -585,8 +498,8 @@ interface FieldProps {
 
 function Field({ label, hint, children }: FieldProps): ReactElement {
   return (
-    <div className="mb-[18px]">
-      <label className="block text-[13px] font-semibold mb-[7px]">{label}</label>
+    <div className="mb-3.5">
+      <label className="block text-[13px] font-semibold mb-1.5">{label}</label>
       {children}
       {hint && <p className="text-xs text-[#94A0B8] mt-1.5">{hint}</p>}
     </div>
@@ -602,7 +515,7 @@ interface SecurityRowProps {
 
 function SecurityRow({ icon: Icon, title, subtitle, right }: SecurityRowProps): ReactElement {
   return (
-    <div className="flex items-center justify-between gap-3.5 p-4 bg-[#F7F8FB] border border-[#E6E9F0] rounded-[11px] mb-2.5">
+    <div className="flex items-center justify-between gap-3.5 p-3.5 bg-[#F7F8FB] border border-[#E6E9F0] rounded-[11px] mb-2">
       <div className="flex items-center gap-3 flex-1">
         <div className="w-[34px] h-[34px] rounded-lg bg-white border border-[#E6E9F0] flex items-center justify-center flex-shrink-0">
           <Icon className="w-4 h-4 text-[#5B647A]" />
@@ -619,31 +532,24 @@ function SecurityRow({ icon: Icon, title, subtitle, right }: SecurityRowProps): 
 
 interface ConfirmationModalProps {
   modal: ModalState;
+  saving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-function ConfirmationModal({ modal, onCancel, onConfirm }: ConfirmationModalProps): ReactElement {
+function ConfirmationModal({ modal, saving, onCancel, onConfirm }: ConfirmationModalProps): ReactElement {
   const sectionLabel = SECTION_LABEL[modal.section];
 
   const copy: Record<ModalKind, { title: string; body: string; confirmLabel: string; danger?: boolean }> = {
     save: {
-      title: modal.section === 'password' ? 'Update password?' : 'Save changes?',
-      body:
-        modal.section === 'password'
-          ? 'Your password will be updated immediately and you\u2019ll stay signed in on this device.'
-          : `You\u2019re about to save changes to your ${sectionLabel} settings.`,
-      confirmLabel: modal.section === 'password' ? 'Update password' : 'Save changes',
+      title: 'Save changes?',
+      body: `You\u2019re about to save changes to your ${sectionLabel} settings.`,
+      confirmLabel: 'Save changes',
     },
     reset: {
       title: 'Reset settings?',
       body: `This will restore your ${sectionLabel} settings to their last saved values. This can\u2019t be undone.`,
       confirmLabel: 'Reset',
-    },
-    password: {
-      title: 'Update password?',
-      body: 'Your password will be updated immediately.',
-      confirmLabel: 'Update password',
     },
     logout: {
       title: 'Log out of all devices?',
@@ -671,12 +577,13 @@ function ConfirmationModal({ modal, onCancel, onConfirm }: ConfirmationModalProp
         <h3 className="text-[16.5px] font-bold m-0 mb-2">{title}</h3>
         <p className="text-[13.5px] text-[#5B647A] leading-relaxed m-0 mb-5">{body}</p>
         <div className="flex gap-2.5">
-          <button onClick={onCancel} className="btn-ghost flex-1 justify-center">
+          <button onClick={onCancel} disabled={saving} className="btn-ghost flex-1 justify-center disabled:opacity-50">
             <X className="w-[15px] h-[15px]" />
             Cancel
           </button>
           <button
             onClick={onConfirm}
+            disabled={saving}
             className="flex-1 justify-center inline-flex items-center gap-1.5 text-[14px] font-semibold rounded-[10px] px-4 py-2.5 text-white transition-opacity hover:opacity-90"
             style={{ backgroundColor: danger ? '#DC2626' : '#0050F5' }}
           >

@@ -46,6 +46,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name", { length: 100 }).notNull(),
   role: userRole("role").notNull(),
   institutionName: varchar("institution_name", { length: 255 }),
+  avatarData: text("avatar_data"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
