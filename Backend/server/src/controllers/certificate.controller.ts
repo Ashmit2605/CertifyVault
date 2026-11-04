@@ -46,6 +46,7 @@ const issueSchema = z
     grade: z.string().trim().max(50).nullable().optional(),
     issueDate: dateOnly,
     expiryDate: dateOnly.nullable().optional(),
+    recipientId: z.number().int().positive().nullable().optional(),
   })
   .strict()
   .refine(
@@ -116,6 +117,7 @@ export async function issueCertificate(
         certificateNumber: parsed.data.certificateNumber?.trim() || null,
         grade: parsed.data.grade?.trim() || null,
         expiryDate: parsed.data.expiryDate ?? null,
+        recipientId: parsed.data.recipientId ?? null,
       },
     );
     res.status(certificate.status === "issued" ? 201 : 202).json({

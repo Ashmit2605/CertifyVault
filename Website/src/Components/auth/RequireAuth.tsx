@@ -56,7 +56,7 @@ export default function RequireAuth({ role, children }: Props) {
       <Navigate
         to="/app/login"
         replace
-        state={{ from: location.pathname }}
+        state={{ from: `${location.pathname}${location.search}` }}
       />
     );
   }

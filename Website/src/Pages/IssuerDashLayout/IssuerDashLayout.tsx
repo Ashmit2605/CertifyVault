@@ -6,6 +6,7 @@ import {
   FileText,
   PlusCircle,
   Users,
+  BadgeCheck,
   LayoutTemplate,
   ShieldCheck,
   Ban,
@@ -50,6 +51,8 @@ const navGroups: NavGroup[] = [
     ],
   },
   { title: "Students", path: "/issuerdashboard/students", icon: Users },
+  { title: "Recipients", path: "/issuerdashboard/recipients", icon: Users },
+  { title: "Claim requests", path: "/issuerdashboard/claims", icon: BadgeCheck },
   {
     title: "Verification",
     icon: ShieldCheck,

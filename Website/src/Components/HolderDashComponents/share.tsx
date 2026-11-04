@@ -1,310 +1,264 @@
-import { useState } from "react";
-import {
-  Link2,
-  QrCode,
-  Copy,
-  Ban,
-  ChevronRight,
-  Check,
-} from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { useSearchParams } from "react-router-dom";
-import { HOLDER_CERTIFICATES } from "../../data/holderMockData";
+import { Ban, Check, Copy, Link2, Loader2, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  createCredentialShareLink,
+  getCredentialShareLinks,
+  getHolderCredential,
+  getHolderCredentials,
+  revokeCredentialShareLink,
+  updateCredentialSharing,
+  type CredentialSharingSettings,
+  type HolderCredential,
+  type HolderCredentialDetail,
+  type HolderShareLink,
+} from "../../utils/holderApi";
 
-type ShareMode = "anyone" | "specific";
-type ShareStatus = "Active" | "Expired" | "Revoked";
+const defaultSettings: CredentialSharingSettings = {
+  visibility: "unlisted",
+  pdfDownloadPolicy: "private",
+  showRecipientName: false,
+  allowStructuredExport: true,
+};
 
-interface ShareRecord {
-  employer: string;
-  purpose: string;
-  created: string;
-  expires: string;
-  status: ShareStatus;
+function isActive(link: HolderShareLink) {
+  return !link.revokedAt && new Date(link.expiresAt).getTime() > Date.now();
 }
 
-const ACTIVE_SHARES: ShareRecord[] = [
-  {
-    employer: "ABC Technologies",
-    purpose: "Job Application",
-    created: "12 Aug 2026",
-    expires: "19 Aug 2026",
-    status: "Active",
-  },
-  {
-    employer: "XYZ Corporation",
-    purpose: "Background Verification",
-    created: "1 Aug 2026",
-    expires: "8 Aug 2026",
-    status: "Expired",
-  },
-];
-
-const DISCLOSURE_FIELDS = [
-  { label: "Degree", defaultOn: true },
-  { label: "Institution", defaultOn: true },
-  { label: "Issue date", defaultOn: true },
-  { label: "Verification status", defaultOn: true },
-  { label: "Personal address", defaultOn: false },
-  { label: "Phone number", defaultOn: false },
-];
-
 export default function Share() {
+  const { getToken } = useAuth();
   const [searchParams] = useSearchParams();
-  const certificate = HOLDER_CERTIFICATES.find((item) => item.id === searchParams.get("certificate")) ?? HOLDER_CERTIFICATES[0];
-  const [mode, setMode] = useState<ShareMode>("specific");
-  const [expiry, setExpiry] = useState("7");
-  const [linkGenerated, setLinkGenerated] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState("");
+  const requestedCertificateId = searchParams.get("certificate");
+  const [credentials, setCredentials] = useState<HolderCredential[]>([]);
+  const [certificateId, setCertificateId] = useState(requestedCertificateId ?? "");
+  const [detail, setDetail] = useState<HolderCredentialDetail | null>(null);
+  const [settings, setSettings] = useState<CredentialSharingSettings>(defaultSettings);
+  const [links, setLinks] = useState<HolderShareLink[]>([]);
+  const [generatedUrl, setGeneratedUrl] = useState("");
+  const [expiry, setExpiry] = useState(7);
+  const [allowPdfDownload, setAllowPdfDownload] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [shares, setShares] = useState(ACTIVE_SHARES);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const generatedLink = "certifyvault.com/share/8fK92xLq71QmP4";
-  const revokeShare = (employer: string) => {
-    setShares((current) => current.map((share) =>
-      share.employer === employer && share.status === "Active"
-        ? { ...share, status: "Revoked" }
-        : share,
-    ));
-  };
+  const selectedCredential = useMemo(
+    () => credentials.find((credential) => credential.certificateId === certificateId),
+    [certificateId, credentials],
+  );
 
-  const handleCopy = async () => {
+  const loadCredentials = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(`https://${generatedLink}`);
-      setCopyError("");
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopyError("Clipboard access was denied. Select and copy the link manually.");
-      setCopied(false);
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      const items = await getHolderCredentials(token);
+      setError("");
+      setCredentials(items);
+      if (items.length === 0) {
+        setDetail(null);
+        setLinks([]);
+      }
+      setCertificateId((current) =>
+        current && items.some((item) => item.certificateId === current)
+          ? current
+          : items[0]?.certificateId ?? "",
+      );
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "The wallet could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadCredentials(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCredentials]);
+
+  const loadSelected = useCallback(async () => {
+    if (!certificateId) {
+      return;
+    }
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      const [credential, shareLinks] = await Promise.all([
+        getHolderCredential(token, certificateId),
+        getCredentialShareLinks(token, certificateId),
+      ]);
+      setError("");
+      setDetail(credential);
+      setLinks(shareLinks);
+      setSettings(credential.sharing ?? defaultSettings);
+      setGeneratedUrl("");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Sharing settings could not be loaded.");
+    }
+  }, [certificateId, getToken]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadSelected(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadSelected]);
+
+  const saveSettings = async (next: CredentialSharingSettings) => {
+    setSettings(next);
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      await updateCredentialSharing(token, certificateId, next);
+      setLinks((current) => current.map((link) => ({ ...link, revokedAt: link.revokedAt ?? new Date().toISOString() })));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Sharing settings could not be saved.");
+      await loadSelected();
+    } finally {
+      setBusy(false);
     }
   };
 
+  const generateLink = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      const link = await createCredentialShareLink(token, certificateId, expiry, allowPdfDownload);
+      setGeneratedUrl(link.url);
+      setLinks(await getCredentialShareLinks(token, certificateId));
+    } catch (linkError) {
+      setError(linkError instanceof Error ? linkError.message : "A share link could not be created.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revokeLink = async (linkId: number) => {
+    setBusy(true);
+    setError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      await revokeCredentialShareLink(token, certificateId, linkId);
+      setLinks((current) => current.map((link) => link.id === linkId ? { ...link, revokedAt: new Date().toISOString() } : link));
+      if (generatedUrl) setGeneratedUrl("");
+    } catch (revokeError) {
+      setError(revokeError instanceof Error ? revokeError.message : "The share link could not be revoked.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!generatedUrl) return;
+    try {
+      await navigator.clipboard.writeText(generatedUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError("Clipboard access was denied. Select and copy the link manually.");
+    }
+  };
+
+  const updateSetting = <K extends keyof CredentialSharingSettings>(
+    key: K,
+    value: CredentialSharingSettings[K],
+  ) => {
+    void saveSettings({ ...settings, [key]: value });
+  };
+
+  if (loading) {
+    return <main className="flex justify-center px-6 py-20"><Loader2 className="h-6 w-6 animate-spin text-[#0050F5]" aria-label="Loading sharing settings" /></main>;
+  }
+
   return (
     <main className="mx-auto max-w-[900px] px-6 py-8 lg:px-10">
-        <p className="mb-5 flex items-center gap-1.5 text-[13px] text-[#8993B4]">
-          {certificate.title} <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-[#000F3E]">Share Certificate</span>
-        </p>
+      <h1 className="mb-1 text-[24px] font-semibold tracking-tight text-[#000F3E]">Share Credential</h1>
+      <p className="mb-7 text-[14px] text-[#6B7494]">Manage public visibility, private download access, and revocable share links.</p>
+      {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+      {!credentials.length ? (
+        <p className="rounded-2xl border border-dashed border-[#DCE6FB] bg-white py-16 text-center text-sm text-[#8993B4]">Claim a credential before configuring sharing.</p>
+      ) : (
+        <>
+          <label className="mb-5 block text-sm font-medium text-[#000F3E]">
+            Credential
+            <select value={certificateId} onChange={(event) => setCertificateId(event.target.value)} className="mt-2 w-full rounded-xl border border-[#E4EAFB] bg-white px-3.5 py-3 text-sm">
+              {credentials.map((credential) => <option key={credential.claimId} value={credential.certificateId}>{credential.title} · {credential.certificateId}</option>)}
+            </select>
+          </label>
 
-        <h1 className="mb-1 text-[24px] font-semibold tracking-tight text-[#000F3E]">
-          Share Certificate
-        </h1>
-        <p className="mb-7 text-[14px] text-[#6B7494]">
-          Create a share-link preview instead of sending a plain PDF.
-        </p>
-        <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="note">
-        Demo mode: link expiry, access revocation, and recipient permissions need backend enforcement.
-        </p>
-
-        {/* Who are you sharing with */}
-        <div className="rounded-2xl border border-[#EAF1FF] bg-white p-7 shadow-[0_1px_2px_rgba(0,15,62,0.04)]">
-          <p className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-[#8993B4]">
-            Who are you sharing with?
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              onClick={() => setMode("anyone")}
-              className={`rounded-xl border p-4 text-left transition-colors ${
-                mode === "anyone"
-                  ? "border-[#0050F5] bg-[#EAF1FF]"
-                  : "border-[#E4EAFB] bg-white hover:bg-[#F5F8FF]"
-              }`}
-            >
-              <p className="text-[14px] font-semibold text-[#000F3E]">
-                Anyone with the link
-              </p>
-              <p className="mt-1 text-[12.5px] text-[#6B7494]">
-                No specific recipient required
-              </p>
-            </button>
-            <button
-              onClick={() => setMode("specific")}
-              className={`rounded-xl border p-4 text-left transition-colors ${
-                mode === "specific"
-                  ? "border-[#0050F5] bg-[#EAF1FF]"
-                  : "border-[#E4EAFB] bg-white hover:bg-[#F5F8FF]"
-              }`}
-            >
-              <p className="text-[14px] font-semibold text-[#000F3E]">
-                Specific employer
-              </p>
-              <p className="mt-1 text-[12.5px] text-[#6B7494]">
-                Track purpose, expiry &amp; access
-              </p>
-            </button>
-          </div>
-
-          {mode === "specific" && (
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-[12.5px] font-medium text-[#4A5578]">
-                  Employer
-                </label>
-                <input
-                  defaultValue="ABC Technologies"
-                  className="mt-1.5 w-full rounded-xl border border-[#E4EAFB] bg-[#F7F9FF] px-3.5 py-2.5 text-[13.5px] text-[#000F3E] focus:border-[#0050F5] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[12.5px] font-medium text-[#4A5578]">
-                  Purpose
-                </label>
-                <input
-                  defaultValue="Job Application"
-                  className="mt-1.5 w-full rounded-xl border border-[#E4EAFB] bg-[#F7F9FF] px-3.5 py-2.5 text-[13.5px] text-[#000F3E] focus:border-[#0050F5] focus:outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="mt-4">
-            <label className="text-[12.5px] font-medium text-[#4A5578]">
-              Link expiry
+          <section className="rounded-2xl border border-[#EAF1FF] bg-white p-6 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#8993B4]">Credential privacy</h2>
+            <label className="mt-5 block text-sm font-medium text-[#4A5578]">
+              Public page visibility
+              <select value={settings.visibility} disabled={busy} onChange={(event) => updateSetting("visibility", event.target.value as CredentialSharingSettings["visibility"])} className="mt-2 w-full rounded-xl border border-[#E4EAFB] bg-white px-3.5 py-3">
+                <option value="private">Private — share links only</option>
+                <option value="unlisted">Unlisted — anyone with the credential URL</option>
+                <option value="public">Public — publicly accessible</option>
+              </select>
             </label>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {["1", "7", "14", "30"].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setExpiry(d)}
-                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium ${
-                    expiry === d
-                      ? "bg-[#0050F5] text-white"
-                      : "border border-[#E4EAFB] bg-white text-[#4A5578] hover:bg-[#F5F8FF]"
-                  }`}
-                >
-                  {d} days
-                </button>
-              ))}
+            <label className="mt-4 block text-sm font-medium text-[#4A5578]">
+              PDF download policy
+              <select value={settings.pdfDownloadPolicy} disabled={busy} onChange={(event) => updateSetting("pdfDownloadPolicy", event.target.value as CredentialSharingSettings["pdfDownloadPolicy"])} className="mt-2 w-full rounded-xl border border-[#E4EAFB] bg-white px-3.5 py-3">
+                <option value="private">Private — wallet only</option>
+                <option value="link">Allow only share links marked for PDF access</option>
+                <option value="public">Allow public downloads</option>
+              </select>
+            </label>
+            <div className="mt-5 space-y-3">
+              <label className="flex items-center gap-3 text-sm text-[#4A5578]"><input type="checkbox" checked={settings.showRecipientName} disabled={busy} onChange={(event) => updateSetting("showRecipientName", event.target.checked)} className="h-4 w-4 accent-[#0050F5]" />Show my name on public verification</label>
+              <label className="flex items-center gap-3 text-sm text-[#4A5578]"><input type="checkbox" checked={settings.allowStructuredExport} disabled={busy} onChange={(event) => updateSetting("allowStructuredExport", event.target.checked)} className="h-4 w-4 accent-[#0050F5]" />Allow structured credential export</label>
             </div>
-          </div>
-        </div>
+          </section>
 
-        {/* Selective disclosure */}
-        <div className="mt-5 rounded-2xl border border-[#EAF1FF] bg-white p-7 shadow-[0_1px_2px_rgba(0,15,62,0.04)]">
-          <p className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-[#8993B4]">
-            What do you want to share?
-          </p>
-          <p className="mb-4 text-[12.5px] text-[#9AA3C2]">
-            Selective disclosure — choose exactly what the verifier can see.
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {DISCLOSURE_FIELDS.map((f) => (
-              <label
-                key={f.label}
-                className="flex items-center gap-3 rounded-xl border border-[#F0F3FC] px-4 py-3"
-              >
-                <input
-                  type="checkbox"
-                  defaultChecked={f.defaultOn}
-                  className="h-4 w-4 rounded accent-[#0050F5]"
-                />
-                <span className="text-[13.5px] text-[#000F3E]">{f.label}</span>
+          <section className="mt-5 rounded-2xl border border-[#EAF1FF] bg-white p-6 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#8993B4]">Create temporary share link</h2>
+            <p className="mt-2 text-sm text-[#6B7494]">{selectedCredential?.title ?? detail?.certificate.title}</p>
+            <div className="mt-5 flex flex-wrap items-end gap-4">
+              <label className="text-sm font-medium text-[#4A5578]">Expires after
+                <select value={expiry} disabled={busy} onChange={(event) => setExpiry(Number(event.target.value))} className="mt-2 block rounded-xl border border-[#E4EAFB] bg-white px-3.5 py-3">
+                  {[1, 7, 14, 30].map((days) => <option key={days} value={days}>{days} days</option>)}
+                </select>
               </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Generate */}
-        {!linkGenerated ? (
-          <button
-            onClick={() => setLinkGenerated(true)}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0050F5] py-3.5 text-[14.5px] font-semibold text-white hover:bg-[#0041CC]"
-          >
-            <Link2 className="h-4.5 w-4.5" />
-            Generate Secure Link
-          </button>
-        ) : (
-          <div className="mt-6 rounded-2xl border border-[#EAF1FF] bg-white p-7 shadow-[0_1px_2px_rgba(0,15,62,0.04)]">
-            <p className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-[#8993B4]">
-              Demo Verification Link
-            </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex flex-1 items-center justify-between gap-3 rounded-xl bg-[#F7F9FF] px-4 py-3">
-                <span className="truncate text-[13.5px] font-medium text-[#000F3E]">
-                  https://{generatedLink}
-                </span>
-                <button
-                  onClick={handleCopy}
-                  className="flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-[#0050F5]"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4" /> Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" /> Copy Link
-                    </>
-                  )}
-                </button>
-              </div>
-              <button
-                onClick={() => setShowQr((visible) => !visible)}
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#DCE6FB] px-4 py-3 text-[13.5px] font-medium text-[#000F3E] hover:bg-[#F5F8FF]"
-                aria-expanded={showQr}
-              >
-                <QrCode className="h-4 w-4 text-[#0050F5]" />
-                {showQr ? "Hide QR" : "Generate QR"}
-              </button>
+              <label className="flex items-center gap-2 pb-3 text-sm text-[#4A5578]"><input type="checkbox" checked={allowPdfDownload} disabled={busy} onChange={(event) => setAllowPdfDownload(event.target.checked)} className="h-4 w-4 accent-[#0050F5]" />Allow PDF download on this link</label>
             </div>
-            {showQr && (
-              <div className="mt-5 flex justify-center rounded-xl border border-[#EAF1FF] bg-white p-5">
-                <QRCodeSVG value={`https://${generatedLink}`} size={180} level="M" includeMargin />
+            <button type="button" disabled={busy || !certificateId} onClick={() => void generateLink()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0050F5] py-3.5 text-sm font-semibold text-white hover:bg-[#0041CC] disabled:opacity-50">
+              <Link2 className="h-4 w-4" />Generate secure link
+            </button>
+            {generatedUrl && (
+              <div className="mt-5 rounded-xl bg-[#F7F9FF] p-4">
+                <div className="flex items-center gap-2">
+                  <input readOnly value={generatedUrl} aria-label="Generated credential share link" className="min-w-0 flex-1 bg-transparent text-sm text-[#000F3E] outline-none" />
+                  <button type="button" onClick={() => void copyLink()} className="flex shrink-0 items-center gap-1 text-sm font-medium text-[#0050F5]">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Copied" : "Copy"}</button>
+                  <button type="button" onClick={() => setShowQr((value) => !value)} aria-expanded={showQr} className="rounded-lg p-2 text-[#0050F5]" aria-label="Toggle QR code"><QrCode className="h-4 w-4" /></button>
+                </div>
+                {showQr && <div className="mt-4 flex justify-center"><QRCodeSVG value={generatedUrl} size={180} level="M" includeMargin /></div>}
               </div>
             )}
-            {copyError && <p className="mt-3 text-sm text-red-600" role="alert">{copyError}</p>}
-            <p className="mt-3 text-[12.5px] text-[#9AA3C2]">
-              Expires {expiry === "1" ? "in 1 day" : `in ${expiry} days`} · CV-VERIFY-8A72K9
-            </p>
-          </div>
-        )}
+          </section>
 
-        {/* Active shares */}
-        <div className="mb-10 mt-8">
-          <p className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-[#8993B4]">
-            Active Shares
-          </p>
-          <div className="flex flex-col gap-3">
-            {shares.map((s, i) => (
-              <div
-                key={i}
-                className="flex flex-col gap-3 rounded-2xl border border-[#EAF1FF] bg-white p-5 shadow-[0_1px_2px_rgba(0,15,62,0.04)] sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-[14px] font-semibold text-[#000F3E]">
-                    {s.employer}
-                  </p>
-                  <p className="text-[12.5px] text-[#6B7494]">
-                    {s.purpose} · Created {s.created}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`rounded-full px-3 py-1 text-[12px] font-medium ${
-                      s.status === "Active"
-                        ? "bg-[#E8F9EF] text-[#1AAE5F]"
-                        : s.status === "Revoked"
-                          ? "bg-[#FDEDEE] text-[#E5484D]"
-                          : "bg-[#F0F3FC] text-[#9AA3C2]"
-                    }`}
-                  >
-                    {s.status === "Active" ? `Expires ${s.expires}` : s.status}
-                  </span>
-                  {s.status === "Active" && (
-                    <button
-                      onClick={() => revokeShare(s.employer)}
-                      className="flex items-center gap-1.5 rounded-lg border border-[#F6D6D7] px-3 py-1.5 text-[12.5px] font-medium text-[#E5484D] hover:bg-[#FDEDEE]"
-                    >
-                      <Ban className="h-3.5 w-3.5" />
-                      Revoke Access
-                    </button>
-                  )}
-                </div>
+          <section className="mb-10 mt-8">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[#8993B4]">Share links</h2>
+            {links.length === 0 ? <p className="rounded-xl bg-white px-4 py-5 text-sm text-[#8993B4]">No share links have been created.</p> : (
+              <div className="flex flex-col gap-3">
+                {links.map((link) => (
+                  <div key={link.id} className="flex flex-col gap-3 rounded-2xl border border-[#EAF1FF] bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div><p className="text-sm font-semibold text-[#000F3E]">Created {new Date(link.createdAt).toLocaleString()}</p><p className="mt-1 text-xs text-[#6B7494]">Expires {new Date(link.expiresAt).toLocaleString()} · PDF {link.allowPdfDownload ? "allowed" : "not allowed"}</p></div>
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${isActive(link) ? "bg-[#E8F9EF] text-[#1AAE5F]" : "bg-[#F0F3FC] text-[#8993B4]"}`}>{isActive(link) ? "Active" : link.revokedAt ? "Revoked" : "Expired"}</span>
+                      {isActive(link) && <button type="button" disabled={busy} onClick={() => void revokeLink(link.id)} className="flex items-center gap-1.5 rounded-lg border border-[#F6D6D7] px-3 py-1.5 text-xs font-medium text-[#E5484D] hover:bg-[#FDEDEE] disabled:opacity-50"><Ban className="h-3.5 w-3.5" />Revoke</button>}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </main>
+            )}
+          </section>
+        </>
+      )}
+    </main>
   );
 }
