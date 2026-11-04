@@ -16,7 +16,12 @@ import { PageHeader } from "../../../../Pages/IssuerDashLayout/IssuerDashLayout"
 import {
   downloadCertificate,
   issueCertificate,
+  createBulkImportJob,
+  createIssuerRecipient,
+  getBulkImportJob,
+  queueIssuerClaimInvitation,
   retryRegistration,
+  verifyIssuerRecipientContact,
   type CertificateIssueInput,
   type CertificateRecord,
 } from "../../../../utils/certificateApi";
@@ -45,12 +50,18 @@ const initialForm = (): CertificateIssueInput => ({
 
 interface BulkRow {
   line: number;
-  input: CertificateIssueInput | null;
+  input: (CertificateIssueInput & {
+    recipientEmail?: string | null;
+    institutionReference?: string | null;
+  }) | null;
   error: string | null;
   certificateNumber?: string;
-  result?: CertificateRecord;
+  resultCertificateId?: string;
+  resultStatus?: string;
   resultError?: string;
 }
+
+type ValidBulkRow = BulkRow & { input: NonNullable<BulkRow["input"]> };
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -115,7 +126,7 @@ function parseBulkCsv(text: string): BulkRow[] {
   const index = (name: string) => headers.indexOf(name);
   const parsedRows = rows.slice(1).map((cells, rowIndex) => {
     const value = (name: string) => cells[index(name)]?.trim() ?? "";
-    const input: CertificateIssueInput = {
+    const input: NonNullable<BulkRow["input"]> = {
       studentName: value("studentname"),
       certificateNumber: value("certificatenumber") || null,
       certificateType: value("certificatetype").toLowerCase(),
@@ -124,6 +135,8 @@ function parseBulkCsv(text: string): BulkRow[] {
       grade: value("grade") || null,
       issueDate: value("issuedate"),
       expiryDate: value("expirydate") || null,
+      recipientEmail: value("recipientemail") || null,
+      institutionReference: value("institutionreference") || null,
     };
     const errors: string[] = [];
     if (!input.studentName) errors.push("Student name is required.");
@@ -200,10 +213,15 @@ export default function IssueCertificate() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<CertificateRecord | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [recipientReference, setRecipientReference] = useState("");
+  const [confirmRecipientEmail, setConfirmRecipientEmail] = useState(false);
+  const [invitationMessage, setInvitationMessage] = useState("");
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkError, setBulkError] = useState("");
+  const [bulkJobId, setBulkJobId] = useState<number | null>(null);
 
   const updateForm = <K extends keyof CertificateIssueInput>(
     key: K,
@@ -216,7 +234,23 @@ export default function IssueCertificate() {
     try {
       const token = await getToken();
       if (!token) throw new Error("Your secure session is unavailable.");
-      const certificate = await issueCertificate(token, form);
+      const email = recipientEmail.trim() || null;
+      const recipient = await createIssuerRecipient(token, {
+        recipientName: form.studentName,
+        email,
+        institutionReference: recipientReference.trim() || null,
+      });
+      if (email && confirmRecipientEmail) {
+        await verifyIssuerRecipientContact(
+          token,
+          recipient.id,
+          "Issuer confirmed this recipient email against institution-held records before issuing the credential.",
+        );
+      }
+      const certificate = await issueCertificate(token, {
+        ...form,
+        recipientId: recipient.id,
+      });
       setIssued(certificate);
     } catch (issueError) {
       setError(
@@ -224,6 +258,23 @@ export default function IssueCertificate() {
           ? issueError.message
           : "Certificate issuance failed.",
       );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleInvitation = async () => {
+    if (!issued || issued.status !== "issued") return;
+    setBusy(true);
+    setError("");
+    setInvitationMessage("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      await queueIssuerClaimInvitation(token, issued.certificateId);
+      setInvitationMessage("Claim invitation queued. Delivery status is available in the credential record.");
+    } catch (invitationError) {
+      setError(invitationError instanceof Error ? invitationError.message : "The invitation could not be queued.");
     } finally {
       setBusy(false);
     }
@@ -286,9 +337,40 @@ export default function IssueCertificate() {
     }
   };
 
+  const pollBulkJob = async (
+    token: string,
+    jobId: number,
+    validRows: ValidBulkRow[],
+  ) => {
+    let currentJob = await getBulkImportJob(token, jobId);
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      const documentByRow = new Map(
+        currentJob.documents.map((document) => [document.rowNumber, document]),
+      );
+      setBulkRows((current) => current.map((row) => {
+        const validIndex = validRows.findIndex((validRow) => validRow.line === row.line);
+        const document = validIndex >= 0 ? documentByRow.get(validIndex + 1) : undefined;
+        if (!document) return row;
+        return {
+          ...row,
+          resultCertificateId: document.certificateId ?? undefined,
+          resultStatus: document.status,
+          resultError: document.error ?? undefined,
+        };
+      }));
+      setBulkProgress(currentJob.completedDocuments);
+      if (["completed", "completed_with_errors", "failed"].includes(currentJob.status)) break;
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+      currentJob = await getBulkImportJob(token, jobId);
+    }
+    if (!["completed", "completed_with_errors", "failed"].includes(currentJob.status)) {
+      setBulkError(`Import job ${jobId} is still running. Check its status again without resubmitting.`);
+    }
+  };
+
   const handleBulkIssue = async () => {
     const validRows = bulkRows.filter(
-      (row): row is BulkRow & { input: CertificateIssueInput } =>
+      (row): row is ValidBulkRow =>
         row.input !== null,
     );
     if (!validRows.length) return;
@@ -298,19 +380,24 @@ export default function IssueCertificate() {
     try {
       const token = await getToken();
       if (!token) throw new Error("Your secure session is unavailable.");
-      for (let index = 0; index < validRows.length; index += 1) {
-        const row = validRows[index];
-        try {
-          row.result = await issueCertificate(token, row.input);
-        } catch (rowError) {
-          row.resultError =
-            rowError instanceof Error ? rowError.message : "Issuance failed.";
-        }
-        setBulkRows((current) =>
-          current.map((item) => (item.line === row.line ? { ...row } : item)),
-        );
-        setBulkProgress(index + 1);
-      }
+      const job = await createBulkImportJob(
+        token,
+        crypto.randomUUID(),
+        validRows.map(({ input }) => ({
+          studentName: input.studentName,
+          certificateNumber: input.certificateNumber,
+          certificateType: input.certificateType,
+          title: input.title,
+          course: input.course,
+          grade: input.grade,
+          issueDate: input.issueDate,
+          expiryDate: input.expiryDate,
+          recipientEmail: input.recipientEmail ?? null,
+          institutionReference: input.institutionReference ?? null,
+        })),
+      );
+      setBulkJobId(job.id);
+      await pollBulkJob(token, job.id, validRows);
     } catch (batchError) {
       setBulkError(
         batchError instanceof Error
@@ -322,10 +409,32 @@ export default function IssueCertificate() {
     }
   };
 
+  const handleResumeBulkJob = async () => {
+    if (!bulkJobId) return;
+    const validRows = bulkRows.filter(
+      (row): row is ValidBulkRow => row.input !== null,
+    );
+    setBulkBusy(true);
+    setBulkError("");
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Your secure session is unavailable.");
+      await pollBulkJob(token, bulkJobId, validRows);
+    } catch (pollError) {
+      setBulkError(pollError instanceof Error ? pollError.message : "The import job status could not be loaded.");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const resetSingle = () => {
     setIssued(null);
     setError("");
     setForm(initialForm());
+    setRecipientEmail("");
+    setRecipientReference("");
+    setConfirmRecipientEmail(false);
+    setInvitationMessage("");
   };
 
   return (
@@ -389,6 +498,27 @@ export default function IssueCertificate() {
                   required
                 />
               </div>
+
+              {!issued && (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-navy">Recipient email (optional)</label>
+                      <input type="email" value={recipientEmail} maxLength={320} onChange={(event) => setRecipientEmail(event.target.value)} className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40" />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-navy">Institution reference (optional)</label>
+                      <input value={recipientReference} maxLength={255} onChange={(event) => setRecipientReference(event.target.value)} className="w-full rounded-lg bg-brand-light px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand/40" />
+                    </div>
+                  </div>
+                  {recipientEmail.trim() && (
+                    <label className="flex items-start gap-2 text-xs leading-5 text-slate-600">
+                      <input type="checkbox" checked={confirmRecipientEmail} onChange={(event) => setConfirmRecipientEmail(event.target.checked)} className="mt-1 h-4 w-4 accent-brand" />
+                      I verified this email address against institution-held records and authorize claim invitations to it.
+                    </label>
+                  )}
+                </>
+              )}
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-navy">
@@ -519,13 +649,25 @@ export default function IssueCertificate() {
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {issued.status === "issued" && (
-                      <button
-                        type="button"
-                        onClick={() => void handleDownload(issued)}
-                        className="flex items-center gap-2 rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand"
-                      >
-                        <Download size={15} /> Download PDF
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleDownload(issued)}
+                          className="flex items-center gap-2 rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand"
+                        >
+                          <Download size={15} /> Download PDF
+                        </button>
+                        {recipientEmail.trim() && confirmRecipientEmail && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleInvitation()}
+                            className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 disabled:opacity-50"
+                          >
+                            {busy ? "Queueing…" : "Send claim invitation"}
+                          </button>
+                        )}
+                      </>
                     )}
                     {(issued.status === "registration_failed" ||
                       issued.status === "pending_registration") && (
@@ -553,6 +695,7 @@ export default function IssueCertificate() {
                       <ArrowLeft size={14} /> Certificates
                     </button>
                   </div>
+                  {invitationMessage && <p className="mt-3 text-sm text-emerald-700">{invitationMessage}</p>}
                 </div>
               )}
             </div>
@@ -591,14 +734,14 @@ export default function IssueCertificate() {
               <div>
                 <h2 className="font-semibold text-navy">CSV certificate batch</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Upload up to 50 records. Each certificate is independently validated and issued.
+                  Upload up to 50 records. Processing is queued durably and each row reports its result.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
                   const csv = [
-                    "studentName,certificateNumber,certificateType,title,course,grade,issueDate,expiryDate",
+                    "studentName,certificateNumber,certificateType,title,course,grade,issueDate,expiryDate,recipientEmail,institutionReference",
                     "Example Student,INST-2026-001,degree,Bachelor of Science,Computer Science,8.5,2026-06-01,",
                   ].join("\r\n");
                   const link = document.createElement("a");
@@ -666,7 +809,7 @@ export default function IssueCertificate() {
                           <td className="px-3 py-2">
                             {row.error ??
                               row.resultError ??
-                              row.result?.status ??
+                            (row.resultCertificateId ? `${row.resultStatus}: ${row.resultCertificateId}` : row.resultStatus) ??
                               (bulkBusy ? "Waiting" : "Ready")}
                           </td>
                         </tr>
@@ -683,17 +826,22 @@ export default function IssueCertificate() {
                   )}
                   <button
                     type="button"
-                    disabled={
-                      bulkBusy ||
-                      !bulkRows.some((row) => row.input) ||
-                      bulkProgress > 0
-                    }
+                    disabled={bulkBusy || !bulkRows.some((row) => row.input) || bulkJobId !== null}
                     onClick={() => void handleBulkIssue()}
                     className="ml-auto flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand/90 disabled:opacity-50"
                   >
                     {bulkBusy && <Loader2 size={16} className="animate-spin" />}
-                    {bulkBusy ? "Issuing records…" : "Confirm valid rows"}
+                    {bulkBusy ? `Processing ${bulkProgress}/${bulkRows.filter((row) => row.input).length}…` : "Queue valid rows"}
                   </button>
+                  {bulkJobId !== null && !bulkBusy && (
+                    <button
+                      type="button"
+                      onClick={() => void handleResumeBulkJob()}
+                      className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-navy hover:bg-slate-50"
+                    >
+                      Refresh job #{bulkJobId}
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -704,6 +852,7 @@ export default function IssueCertificate() {
                 setBulkRows([]);
                 setBulkProgress(0);
                 setBulkError("");
+                setBulkJobId(null);
               }}
               disabled={bulkBusy}
               className="flex items-center gap-1 text-sm text-slate-500 hover:text-navy disabled:opacity-50"

@@ -5,10 +5,12 @@ import {
   ShieldCheck,
   Home,
   FileBadge,
+  BadgeCheck,
   ScanSearch,
   Share2,
   Activity,
   UserRound,
+  KeyRound,
   Bell,
   Search,
   Menu,
@@ -28,10 +30,12 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: "Home", path: "/holderdashboard", icon: Home },
   { title: "My Certificates", path: "/holderdashboard/certificates", icon: FileBadge },
+  { title: "Claim credentials", path: "/holderdashboard/claims", icon: BadgeCheck },
   { title: "Verification", path: "/holderdashboard/verification", icon: ScanSearch },
   { title: "Share", path: "/holderdashboard/share", icon: Share2 },
   { title: "Activity", path: "/holderdashboard/activity", icon: Activity },
   { title: "Profile", path: "/holderdashboard/profile", icon: UserRound },
+  { title: "Security", path: "/holderdashboard/security", icon: KeyRound },
 ];
 
 export function TopNav() {

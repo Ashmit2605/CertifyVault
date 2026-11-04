@@ -39,6 +39,7 @@ export interface CertificateIssueInput {
   grade: string | null;
   issueDate: string;
   expiryDate: string | null;
+  recipientId?: number | null;
 }
 
 export interface CertificateListResult {
@@ -53,6 +54,23 @@ export interface IssuerCertificateStats {
   failedRegistration: number;
   revoked: number;
   issuedThisMonth: number;
+}
+
+export interface BulkImportDocument {
+  id: number;
+  rowNumber: number;
+  status: string;
+  error: string | null;
+  certificateId: string | null;
+}
+
+export interface BulkImportJob {
+  id: number;
+  status: "queued" | "processing" | "completed" | "completed_with_errors" | "failed";
+  totalDocuments: number;
+  completedDocuments: number;
+  failedDocuments: number;
+  documents: BulkImportDocument[];
 }
 
 export interface CertificateAuditRecord {
@@ -78,6 +96,25 @@ export interface CertificateVerificationResult {
     certificateHash: string;
     blockchainNetwork: string | null;
     blockchainTxHash: string | null;
+  };
+}
+
+export interface PublicCredentialPageData {
+  certificateId: string;
+  valid: boolean;
+  status: string;
+  signedProofValid: boolean;
+  blockchainProofStatus: "confirmed" | "pending" | "mismatch" | "not_checked";
+  credential: {
+    title: string;
+    issueDate: string | null;
+    institutionName: string | null;
+    recipientName?: string;
+  };
+  sharing: {
+    visibility: "public" | "unlisted" | "private";
+    pdfDownloadPolicy: "private" | "link" | "public";
+    canDownloadPdf: boolean;
   };
 }
 
@@ -217,6 +254,129 @@ export async function issueCertificate(
     body: JSON.stringify(input),
   });
   return parseCertificate(getData(response).certificate);
+}
+
+export async function createIssuerRecipient(
+  token: string,
+  input: {
+    recipientName: string;
+    email?: string | null;
+    institutionReference?: string | null;
+  },
+): Promise<{ id: number }> {
+  const data = getData(await certificateRequest("/issuer/recipients", token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  }));
+  if (
+    typeof data.recipient !== "object" ||
+    data.recipient === null ||
+    !("id" in data.recipient) ||
+    typeof data.recipient.id !== "number"
+  ) {
+    throw new Error("The issuer service returned an invalid recipient record.");
+  }
+  return { id: data.recipient.id };
+}
+
+export async function verifyIssuerRecipientContact(
+  token: string,
+  recipientId: number,
+  evidence: string,
+): Promise<void> {
+  await certificateRequest(
+    `/issuer/recipients/${recipientId}/verify-contact`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ confirmation: true, evidence }),
+    },
+  );
+}
+
+export async function queueIssuerClaimInvitation(
+  token: string,
+  certificateId: string,
+): Promise<void> {
+  await certificateRequest(
+    `/issuer/credentials/${encodeURIComponent(certificateId)}/invitations`,
+    token,
+    { method: "POST" },
+  );
+}
+
+export async function createBulkImportJob(
+  token: string,
+  idempotencyKey: string,
+  rows: Record<string, string | null>[],
+): Promise<BulkImportJob> {
+  const data = getData(await certificateRequest("/issuer/import-jobs", token, {
+    method: "POST",
+    body: JSON.stringify({ idempotencyKey, rows }),
+  }));
+  return parseBulkImportJob(data.job);
+}
+
+export async function getBulkImportJob(
+  token: string,
+  jobId: number,
+): Promise<BulkImportJob> {
+  const data = getData(await certificateRequest(`/issuer/import-jobs/${jobId}`, token));
+  return parseBulkImportJob(data.job);
+}
+
+function parseBulkImportJob(value: unknown): BulkImportJob {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("id" in value) ||
+    typeof value.id !== "number" ||
+    !("status" in value) ||
+    !["queued", "processing", "completed", "completed_with_errors", "failed"].includes(String(value.status)) ||
+    !("totalDocuments" in value) ||
+    typeof value.totalDocuments !== "number" ||
+    !("completedDocuments" in value) ||
+    typeof value.completedDocuments !== "number" ||
+    !("failedDocuments" in value) ||
+    typeof value.failedDocuments !== "number" ||
+    !("documents" in value) ||
+    !Array.isArray(value.documents)
+  ) {
+    throw new Error("The issuer service returned invalid bulk-job details.");
+  }
+  const documents = value.documents.map((document: unknown) => {
+    if (
+      typeof document !== "object" ||
+      document === null ||
+      !("id" in document) ||
+      typeof document.id !== "number" ||
+      !("rowNumber" in document) ||
+      typeof document.rowNumber !== "number" ||
+      !("status" in document) ||
+      typeof document.status !== "string" ||
+      !("error" in document) ||
+      !(typeof document.error === "string" || document.error === null) ||
+      !("certificateId" in document) ||
+      !(typeof document.certificateId === "string" || document.certificateId === null)
+    ) {
+      throw new Error("The issuer service returned an invalid bulk-job row.");
+    }
+    return {
+      id: document.id,
+      rowNumber: document.rowNumber,
+      status: document.status,
+      error: document.error,
+      certificateId: document.certificateId,
+    };
+  });
+  return {
+    id: value.id,
+    status: value.status as BulkImportJob["status"],
+    totalDocuments: value.totalDocuments,
+    completedDocuments: value.completedDocuments,
+    failedDocuments: value.failedDocuments,
+    documents,
+  };
 }
 
 export async function listCertificates(
@@ -478,4 +638,110 @@ export async function verifyCertificateByQr(
       blockchainTxHash: nullableValue("blockchainTxHash"),
     },
   };
+}
+
+export async function getPublicCredential(
+  certificateId: string,
+  shareToken?: string,
+): Promise<PublicCredentialPageData> {
+  const query = new URLSearchParams();
+  if (shareToken) query.set("share", shareToken);
+  const queryString = query.toString();
+  const suffix = queryString ? `?${queryString}` : "";
+  const response = await fetch(
+    `${apiBaseUrl}/public/credentials/${encodeURIComponent(certificateId)}${suffix}`,
+  );
+  const body = await parseResponse(response);
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("data" in body) ||
+    typeof body.data !== "object" ||
+    body.data === null
+  ) {
+    throw new Error("The credential service returned an invalid public credential.");
+  }
+
+  const { data } = body;
+  if (
+    !("certificateId" in data) ||
+    data.certificateId !== certificateId ||
+    !("valid" in data) ||
+    typeof data.valid !== "boolean" ||
+    !("status" in data) ||
+    typeof data.status !== "string" ||
+    !("signedProofValid" in data) ||
+    typeof data.signedProofValid !== "boolean" ||
+    !("blockchainProofStatus" in data) ||
+    !["confirmed", "pending", "mismatch", "not_checked"].includes(
+      String(data.blockchainProofStatus),
+    ) ||
+    !("credential" in data) ||
+    typeof data.credential !== "object" ||
+    data.credential === null ||
+    !("title" in data.credential) ||
+    typeof data.credential.title !== "string" ||
+    !("issueDate" in data.credential) ||
+    !(typeof data.credential.issueDate === "string" || data.credential.issueDate === null) ||
+    !("institutionName" in data.credential) ||
+    !(
+      typeof data.credential.institutionName === "string" ||
+      data.credential.institutionName === null
+    ) ||
+    !("sharing" in data) ||
+    typeof data.sharing !== "object" ||
+    data.sharing === null ||
+    !("visibility" in data.sharing) ||
+    !["public", "unlisted", "private"].includes(String(data.sharing.visibility)) ||
+    !("pdfDownloadPolicy" in data.sharing) ||
+    !["private", "link", "public"].includes(String(data.sharing.pdfDownloadPolicy)) ||
+    !("canDownloadPdf" in data.sharing) ||
+    typeof data.sharing.canDownloadPdf !== "boolean" ||
+    ("recipientName" in data.credential && typeof data.credential.recipientName !== "string")
+  ) {
+    throw new Error("The credential service returned invalid public credential data.");
+  }
+
+  return {
+    certificateId: data.certificateId,
+    valid: data.valid,
+    status: data.status,
+    signedProofValid: data.signedProofValid,
+    blockchainProofStatus: data.blockchainProofStatus as PublicCredentialPageData["blockchainProofStatus"],
+    credential: {
+      title: data.credential.title,
+      issueDate: data.credential.issueDate,
+      institutionName: data.credential.institutionName,
+      ...("recipientName" in data.credential && typeof data.credential.recipientName === "string"
+        ? { recipientName: data.credential.recipientName }
+        : {}),
+    },
+    sharing: {
+      visibility: data.sharing.visibility as PublicCredentialPageData["sharing"]["visibility"],
+      pdfDownloadPolicy: data.sharing.pdfDownloadPolicy as PublicCredentialPageData["sharing"]["pdfDownloadPolicy"],
+      canDownloadPdf: data.sharing.canDownloadPdf,
+    },
+  };
+}
+
+export async function downloadPublicCredentialPdf(
+  certificateId: string,
+  shareToken?: string,
+): Promise<Blob> {
+  const query = new URLSearchParams();
+  if (shareToken) query.set("share", shareToken);
+  const queryString = query.toString();
+  const suffix = queryString ? `?${queryString}` : "";
+  const response = await fetch(
+    `${apiBaseUrl}/public/credentials/${encodeURIComponent(certificateId)}/download${suffix}`,
+  );
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const message =
+      typeof body === "object" && body !== null && "message" in body && typeof body.message === "string"
+        ? body.message
+        : "PDF download is not available.";
+    throw new Error(message);
+  }
+  return response.blob();
 }

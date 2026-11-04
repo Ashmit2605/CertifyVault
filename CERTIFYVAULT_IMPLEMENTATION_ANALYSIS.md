@@ -82,3 +82,11 @@ Replace fake issuer certificate rows and simulated issuance with the API. Preser
 3. Add scoped certificate, verification, dashboard, and revocation APIs with explicit failure states.
 4. Wire the issuer issue and certificate-list pages to real APIs.
 5. Add targeted tests and update backend setup/API documentation.
+
+## Follow-up implementation in this working tree
+
+The issuer-issued PDF QR now opens a permanent frontend route at `/credentials/:certificateId` using only the credential ID. The public API validates the signed proof retained in backend-managed certificate metadata, checks current credential status and the on-chain PDF digest when applicable, and returns only issuer-approved identifying metadata (title, institution, and issue date). No verification token appears in the public URL. Recipient details and original PDF access remain excluded from this public response. Existing PDFs and their QR URLs are unchanged.
+
+The lifecycle implementation has since expanded beyond that original verification-page change. The backend now includes issuer-owned recipient records, email-attested claim invitations and an outbox worker, institution discovery and issuer review, explicit holder claim completion, a holder wallet, privacy settings and expiring share links, policy-checked public PDF access, persisted/idempotent CSV jobs, W3C VC 2.0 credentials with Data Integrity proof verification, and holder WebAuthn passkey management. New frontend routes and screens use these APIs.
+
+The original repository-state descriptions above are the baseline analysis, not a description of the current tree. See [CERTIFYVAULT_IMPLEMENTATION_REPORT.md](./CERTIFYVAULT_IMPLEMENTATION_REPORT.md) for implemented scope, validation, and deployment prerequisites. Migrations remain unapplied; live PostgreSQL, chain, email-provider, and authenticator flows require deployment configuration and have not been tested in this environment.

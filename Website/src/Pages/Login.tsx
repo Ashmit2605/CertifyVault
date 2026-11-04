@@ -146,6 +146,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const location = useLocation()
+  const returnTo = (() => {
+    const state: unknown = location.state
+    if (
+      typeof state === "object" &&
+      state !== null &&
+      "from" in state &&
+      typeof state.from === "string" &&
+      state.from.startsWith("/") &&
+      !state.from.startsWith("//")
+    ) return state.from
+    return undefined
+  })()
   const [error, setError] = useState(() => {
     const state: unknown = location.state
     return typeof state === 'object' &&
@@ -176,7 +188,7 @@ export default function LoginPage() {
     }
 
     if (isSignedIn) {
-      navigate('/app/auth-callback', { replace: true })
+      navigate('/app/auth-callback', { replace: true, state: { returnTo } })
       return
     }
 
@@ -195,7 +207,7 @@ export default function LoginPage() {
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId })
-        navigate('/app/auth-callback', { replace: true })
+        navigate('/app/auth-callback', { replace: true, state: { returnTo } })
         return
       }
 

@@ -11,6 +11,8 @@ const Holders = lazy(() => import("./Pages/Holders"));
 const Verifiers = lazy(() => import("./Pages/Verifiers"));
 const Security = lazy(() => import("./Pages/Security"));
 const Verify = lazy(() => import("./Pages/Verify"));
+const PublicCredential = lazy(() => import("./Pages/PublicCredential"));
+const ClaimInvitation = lazy(() => import("./Pages/ClaimInvitation"));
 const About = lazy(() => import("./Pages/About"));
 const Contact = lazy(() => import("./Pages/Contact"));
 const LoginPage = lazy(() => import("./Pages/Login"));
@@ -63,6 +65,8 @@ const StudentsProvider = lazy(async () => {
   return { default: module.StudentsProvider };
 });
 const Students = lazy(() => import("./Components/IssuerDashComponents/Students/students"));
+const IssuerRecipients = lazy(() => import("./Components/IssuerDashComponents/Students/IssuerRecipients"));
+const IssuerClaims = lazy(() => import("./Components/IssuerDashComponents/Students/IssuerClaims"));
 const StudentCertificateHistory = lazy(async () => {
   const module = await import("./Components/IssuerDashComponents/Students/students");
   return { default: module.StudentCertificateHistory };
@@ -82,10 +86,12 @@ const HolderDashboardLayout = lazy(async () => {
 });
 const HolderHome = lazy(() => import("./Components/HolderDashComponents/home"));
 const MyCertificates = lazy(() => import("./Components/HolderDashComponents/Mycertificates"));
+const ClaimCredentials = lazy(() => import("./Components/HolderDashComponents/ClaimCredentials"));
 const HolderVerification = lazy(() => import("./Components/HolderDashComponents/Verification"));
 const Share = lazy(() => import("./Components/HolderDashComponents/share"));
 const Activity = lazy(() => import("./Components/HolderDashComponents/Activity"));
 const HolderProfile = lazy(() => import("./Components/HolderDashComponents/Profile"));
+const HolderSecurity = lazy(() => import("./Components/HolderDashComponents/Security"));
 
 // Administrator dashboard
 const AdminDashLayout = lazy(() => import("./Pages/AdminDashLayout/AdminDashLayout"));
@@ -139,6 +145,8 @@ export default function App() {
       <Route path="/app/register" element={<SignupPage />} />
       <Route path="/app/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/app/auth-callback" element={<AuthCallbackPage />} />
+      <Route path="/credentials/:certificateId" element={<PublicCredential />} />
+      <Route path="/claim-invitation" element={<ClaimInvitation />} />
 
       {/* ── Public marketing pages ── */}
       <Route element={<Layout />}>
@@ -174,10 +182,12 @@ export default function App() {
       <Route path="/holderdashboard" element={<RequireAuth role="holder"><HolderDashboardLayout /></RequireAuth>}>
         <Route index element={<HolderHome />} />
         <Route path="certificates" element={<MyCertificates />} />
+        <Route path="claims" element={<ClaimCredentials />} />
         <Route path="verification" element={<HolderVerification />} />
         <Route path="share" element={<Share />} />
         <Route path="activity" element={<Activity />} />
         <Route path="profile" element={<HolderProfile />} />
+        <Route path="security" element={<HolderSecurity />} />
       </Route>
 
       {/* ── Issuer Dashboard ── */}
@@ -248,6 +258,8 @@ export default function App() {
             </StudentsProvider>
           }
         />
+        <Route path="recipients" element={<IssuerRecipients />} />
+        <Route path="claims" element={<IssuerClaims />} />
 
         {/* Settings */}
         <Route path="settings" element={<SettingsSidebar />}>
