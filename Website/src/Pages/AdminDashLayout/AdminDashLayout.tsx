@@ -171,6 +171,8 @@ function LogoutConfirmModal({ isOpen, onCancel, onConfirm }: LogoutConfirmModalP
         right: 0,
         bottom: 0,
         background: "rgba(0, 15, 62, 0.45)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
         zIndex: 2000,
         display: "flex",
         alignItems: "center",
@@ -656,7 +658,7 @@ export default function AdminDashLayout() {
 
   const handleLogoutConfirm = () => {
     setShowLogoutConfirm(false);
-    void signOut({ redirectUrl: "/app/login" });
+    void signOut().then(() => navigate("/app/login", { replace: true }));
   };
 
   return (
