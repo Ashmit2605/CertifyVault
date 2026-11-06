@@ -42,6 +42,48 @@ export class CredentialLifecycleError extends Error {
   }
 }
 
+function workerErrorDetails(error: unknown) {
+  if (error instanceof Error) {
+    const details: {
+      errorName: string;
+      errorMessage: string;
+      errorCode?: string;
+      causeName?: string;
+    } = {
+      errorName: error.name,
+      errorMessage: error.message,
+    };
+    let cause: unknown = error;
+    for (let depth = 0; depth < 5; depth += 1) {
+      if (
+        typeof cause !== "object" ||
+        cause === null ||
+        !("cause" in cause)
+      ) {
+        break;
+      }
+      cause = cause.cause;
+      if (cause instanceof Error) {
+        details.errorMessage = cause.message;
+        details.causeName = cause.name;
+      }
+      if (
+        typeof cause === "object" &&
+        cause !== null &&
+        "code" in cause &&
+        typeof cause.code === "string"
+      ) {
+        details.errorCode = cause.code;
+      }
+    }
+    return details;
+  }
+  return {
+    errorName: "UnknownError",
+    errorMessage: String(error),
+  };
+}
+
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -1441,7 +1483,7 @@ export function startBulkImportWorker() {
     void processBulkImportOnce()
       .catch((error: unknown) => {
         console.error("Bulk import worker failed:", {
-          errorName: error instanceof Error ? error.name : "UnknownError",
+          ...workerErrorDetails(error),
         });
       })
       .finally(() => {
@@ -1651,7 +1693,7 @@ export function startInvitationOutboxWorker() {
   const timer = setInterval(() => {
     void processInvitationOutboxOnce().catch((error: unknown) => {
       console.error("Claim invitation worker failed:", {
-        errorName: error instanceof Error ? error.name : "UnknownError",
+        ...workerErrorDetails(error),
       });
     });
   }, 15_000);

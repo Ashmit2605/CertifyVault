@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 import {
   Save,
   RotateCcw,
@@ -60,6 +61,7 @@ export default function AdminSettingsPage(): ReactElement {
   const { getToken } = useAuth();
   const { openUserProfile, signOut } = useClerk();
   const { user } = useUser();
+  const navigate = useNavigate();
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
 
@@ -214,7 +216,8 @@ export default function AdminSettingsPage(): ReactElement {
           );
         } else {
           await revokeAdminSessions(token);
-          await signOut({ redirectUrl: '/app/login' });
+          await signOut();
+          navigate('/app/login', { replace: true });
           return;
         }
         setModal(null);
@@ -423,7 +426,7 @@ export default function AdminSettingsPage(): ReactElement {
               </div>
               <button
                 onClick={() => openModal('logout', 'profile')}
-                className="shrink-0 rounded-lg border border-rose-200 bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-rose-600 transition-colors hover:bg-rose-50"
+                className="shrink-0 cursor-pointer rounded-lg border border-rose-200 bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-rose-600 transition-colors hover:bg-rose-50"
               >
                 Log out all
               </button>
@@ -465,6 +468,7 @@ export default function AdminSettingsPage(): ReactElement {
           transition: opacity .15s ease;
         }
         .btn-primary:hover { opacity: 0.92; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-ghost {
           font-family: inherit;
           font-size: 14px;
@@ -481,6 +485,7 @@ export default function AdminSettingsPage(): ReactElement {
           transition: background .15s ease;
         }
         .btn-ghost:hover { background: #F7F8FB; }
+        .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
       `}</style>
     </div>
   );
@@ -577,14 +582,14 @@ function ConfirmationModal({ modal, saving, onCancel, onConfirm }: ConfirmationM
         <h3 className="text-[16.5px] font-bold m-0 mb-2">{title}</h3>
         <p className="text-[13.5px] text-[#5B647A] leading-relaxed m-0 mb-5">{body}</p>
         <div className="flex gap-2.5">
-          <button onClick={onCancel} disabled={saving} className="btn-ghost flex-1 justify-center disabled:opacity-50">
+          <button onClick={onCancel} disabled={saving} className="btn-ghost flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed">
             <X className="w-[15px] h-[15px]" />
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={saving}
-            className="flex-1 justify-center inline-flex items-center gap-1.5 text-[14px] font-semibold rounded-[10px] px-4 py-2.5 text-white transition-opacity hover:opacity-90"
+            className="flex-1 cursor-pointer justify-center inline-flex items-center gap-1.5 text-[14px] font-semibold rounded-[10px] px-4 py-2.5 text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: danger ? '#DC2626' : '#0050F5' }}
           >
             {confirmLabel}

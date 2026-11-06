@@ -14,6 +14,11 @@ export async function authMiddleware(
   res: Response,
   next: NextFunction,
 ) {
+  if (req.method === "OPTIONS") {
+    next();
+    return;
+  }
+
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
     res.status(503).json({
