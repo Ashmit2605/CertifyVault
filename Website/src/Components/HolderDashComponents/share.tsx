@@ -172,11 +172,11 @@ export default function Share() {
   };
 
   if (loading) {
-    return <main className="flex justify-center px-6 py-20"><Loader2 className="h-6 w-6 animate-spin text-[#0050F5]" aria-label="Loading sharing settings" /></main>;
+    return <main className="mx-auto flex min-h-[60vh] w-full max-w-[900px] items-center justify-center px-4 py-6 sm:px-6 xl:px-10 xl:py-8"><Loader2 className="h-6 w-6 animate-spin text-[#0050F5]" aria-label="Loading sharing settings" /></main>;
   }
 
   return (
-    <main className="mx-auto max-w-[900px] px-6 py-8 lg:px-10">
+    <main className="mx-auto w-full max-w-[900px] px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
       <h1 className="mb-1 text-[24px] font-semibold tracking-tight text-[#000F3E]">Share Credential</h1>
       <p className="mb-7 text-[14px] text-[#6B7494]">Manage public visibility, private download access, and revocable share links.</p>
       {error && <p role="alert" className="mb-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}

@@ -11,9 +11,29 @@ const dashboardData = {
   institutionName: 'PCCOER',
   verified: true,
   totalCertificates: 12450,
+  issuedCount: null,
   verifiedCount: 8921,
   pendingCount: 143,
+  failedRegistrationCount: null,
+  revokedCount: null,
+  issuedThisMonthCount: null,
 }
+
+const stats: {
+  label: string
+  value: number | null
+  icon: IoniconsName
+  color: string
+  backgroundColor: string
+}[] = [
+  { label: 'Total certificates', value: dashboardData.totalCertificates, icon: 'document-text-outline', color: Brand.blue, backgroundColor: Brand.lightBlue },
+  { label: 'Issued', value: dashboardData.issuedCount, icon: 'shield-checkmark-outline', color: Brand.success, backgroundColor: '#E8F9EF' },
+  { label: 'Pending registration', value: dashboardData.pendingCount, icon: 'time-outline', color: '#D97706', backgroundColor: '#FFF6E5' },
+  { label: 'Registration failed', value: dashboardData.failedRegistrationCount, icon: 'alert-circle-outline', color: Brand.danger, backgroundColor: '#FDEDEE' },
+  { label: 'Revoked', value: dashboardData.revokedCount, icon: 'ban-outline', color: Brand.navy, backgroundColor: Brand.bg4 },
+  { label: 'Issued this month', value: dashboardData.issuedThisMonthCount, icon: 'calendar-outline', color: Brand.blue, backgroundColor: Brand.lightBlue },
+  { label: 'Verified', value: dashboardData.verifiedCount, icon: 'checkmark-circle-outline', color: Brand.success, backgroundColor: '#E8F9EF' },
+]
 
 const quickActions: { icon: IoniconsName; label: string; route: string; tint: string }[] = [
   { icon: 'add-circle-outline', label: 'Issue Certificate', route: '/(issuer)/issue', tint: Brand.blue },
@@ -81,22 +101,21 @@ export default function IssuerHome() {
             )}
           </View>
 
-          <View style={s.totalBox}>
-            <Text style={s.totalLabel}>Certificates</Text>
-            <Text style={s.totalValue}>{dashboardData.totalCertificates.toLocaleString()}</Text>
-          </View>
-
-          <View style={s.splitRow}>
-            <View style={[s.splitBox, { marginRight: 10 }]}>
-              <Text style={s.splitLabel}>Verified</Text>
-              <Text style={[s.splitValue, { color: Brand.success }]}>{dashboardData.verifiedCount.toLocaleString()}</Text>
-            </View>
-            <View style={s.splitBox}>
-              <Text style={s.splitLabel}>Pending</Text>
-              <Text style={[s.splitValue, { color: '#D97706' }]}>{dashboardData.pendingCount}</Text>
-            </View>
-          </View>
         </View>
+
+        {/* ── Certificate statistics ── */}
+        <View style={s.statsGrid}>
+          {stats.map((stat) => (
+            <View key={stat.label} style={s.statCard}>
+              <View style={[s.statIcon, { backgroundColor: stat.backgroundColor }]}>
+                <Ionicons name={stat.icon} size={19} color={stat.color} />
+              </View>
+              <Text style={s.statLabel}>{stat.label}</Text>
+              <Text style={s.statValue}>{stat.value === null ? '—' : stat.value.toLocaleString()}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={s.statsNote}>Additional issuer totals will appear when mobile statistics are connected.</Text>
 
         {/* ── Quick Actions ── */}
         <View style={s.section}>
@@ -121,7 +140,7 @@ export default function IssuerHome() {
 
         {/* ── Recent Activity ── */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Recent Activity</Text>
+          <Text style={s.sectionTitle}>Recent certificate activity</Text>
           <View style={s.activityCard}>
             {recentActivity.map((item, i) => (
               <View key={item.id} style={[s.activityRow, i < recentActivity.length - 1 && s.activityRowBorder]}>
@@ -164,14 +183,12 @@ const s = StyleSheet.create({
   verifiedPill:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   verifiedPillText:   { fontSize: 10, fontWeight: '600', color: 'white', opacity: 0.85 },
 
-  totalBox:           { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 },
-  totalLabel:         { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 },
-  totalValue:         { fontSize: 26, fontWeight: '800', color: 'white' },
-
-  splitRow:           { flexDirection: 'row' },
-  splitBox:           { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 },
-  splitLabel:         { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 },
-  splitValue:         { fontSize: 18, fontWeight: '800' },
+  statsGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statCard:           { width: '47%', minHeight: 116, padding: 14, backgroundColor: 'white', borderRadius: 16, borderWidth: 1, borderColor: Brand.bg4, gap: 6 },
+  statIcon:           { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  statLabel:          { fontSize: 11, color: Brand.navy, opacity: 0.55 },
+  statValue:          { fontSize: 20, fontWeight: '800', color: Brand.navy },
+  statsNote:          { fontSize: 11, lineHeight: 16, color: Brand.navy, opacity: 0.45, marginTop: -14 },
 
   // Sections
   section:            { gap: 10 },

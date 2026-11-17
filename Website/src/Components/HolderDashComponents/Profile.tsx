@@ -32,7 +32,7 @@ export default function Profile() {
   };
 
   return (
-    <main className="mx-auto max-w-[900px] px-6 py-8 lg:px-10">
+    <main className="mx-auto w-full max-w-[900px] px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">My Profile</h1>
         <p className="mt-1 text-gray-600">Manage your profile information</p>

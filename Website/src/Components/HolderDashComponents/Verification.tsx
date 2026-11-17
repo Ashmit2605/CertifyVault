@@ -75,7 +75,7 @@ export default function Verification() {
   };
 
   return (
-    <main className="mx-auto max-w-[1200px] px-6 py-8 lg:px-10">
+    <main className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-gray-900">Certificate Verification</h1>
         <p className="mt-1 text-gray-600">Track verification requests from employers and organizations</p>

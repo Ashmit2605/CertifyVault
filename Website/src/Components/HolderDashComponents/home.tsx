@@ -62,9 +62,9 @@ export default function Home() {
   const recentCertificate = HOLDER_CERTIFICATES[0];
 
   return (
-    <main className="mx-auto max-w-[1440px] px-6 py-8 lg:px-10">
+    <main className="mx-auto w-full max-w-[1440px] space-y-6 px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
         {/* Greeting */}
-        <div className="mb-7">
+        <div>
           <h1 className="text-[26px] font-semibold tracking-tight text-[#000F3E]">
             Good evening, Atharv 👋
           </h1>
@@ -74,7 +74,7 @@ export default function Home() {
         </div>
 
         {/* Stat cards */}
-        <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           {STATS.map((s) => (
             <div
               key={s.label}

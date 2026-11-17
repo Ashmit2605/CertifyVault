@@ -3,22 +3,23 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { Brand } from '@/constants/theme'
-import { HOLDER_ACTIVITY } from '@/data/holderMockData'
+import { HOLDER_ACTIVITY, HOLDER_CERTIFICATES } from '@/data/holderMockData'
 
 const stats = [
-  { label: 'Total Certificates', value: '7', icon: 'ribbon-outline' as const, color: Brand.blue, bg: Brand.lightBlue },
-  { label: 'Verified', value: '7', icon: 'shield-checkmark-outline' as const, color: Brand.success, bg: '#E8F9EF' },
-  { label: 'Revoked', value: '0', icon: 'shield-outline' as const, color: Brand.danger, bg: '#FDEDEE' },
+  { label: 'Total Certificates', value: String(HOLDER_CERTIFICATES.length), icon: 'ribbon-outline' as const, color: Brand.blue, bg: Brand.lightBlue },
+  { label: 'Verified', value: String(HOLDER_CERTIFICATES.filter(certificate => certificate.status === 'Verified').length), icon: 'shield-checkmark-outline' as const, color: Brand.success, bg: '#E8F9EF' },
+  { label: 'Revoked', value: String(HOLDER_CERTIFICATES.filter(certificate => certificate.status === 'Revoked').length), icon: 'shield-outline' as const, color: Brand.danger, bg: '#FDEDEE' },
 ]
 
 export default function HolderHome() {
   const router = useRouter() as any
+  const recentCertificate = HOLDER_CERTIFICATES[0]
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
     <Text style={s.eyebrow}>CERTIFICATE HOLDER</Text>
     <Text style={s.title}>Good evening, Atharv</Text>
     <Text style={s.subtitle}>Your credentials are safe and verified.</Text>
     <View style={s.stats}>{stats.map(stat => <View key={stat.label} style={s.statCard}><View style={[s.statIcon, { backgroundColor: stat.bg }]}><Ionicons name={stat.icon} size={21} color={stat.color} /></View><View><Text style={s.statLabel}>{stat.label}</Text><Text style={s.statValue}>{stat.value}</Text></View></View>)}</View>
-    <View style={s.card}><Text style={s.sectionLabel}>RECENT CERTIFICATE</Text><View style={s.certRow}><View style={s.certIcon}><Text style={s.certEmoji}>🎓</Text></View><View style={s.certInfo}><Text style={s.certTitle}>B.E. Computer Engineering</Text><Text style={s.muted}>PCCOER</Text><Text style={s.smallMuted}>Issued: 15 June 2026</Text><Text style={s.verified}><Ionicons name="shield-checkmark" size={13} color={Brand.success} /> Verified</Text></View></View><View style={s.actions}><TouchableOpacity style={s.outlineBtn} onPress={() => router.push('/(holder)/certificates')}><Ionicons name="eye-outline" size={16} color={Brand.navy} /><Text style={s.outlineText}>View</Text></TouchableOpacity><TouchableOpacity style={s.primaryBtn} onPress={() => router.push('/(holder)/share')}><Ionicons name="share-social-outline" size={16} color="white" /><Text style={s.primaryText}>Share</Text></TouchableOpacity></View></View>
+    <View style={s.card}><Text style={s.sectionLabel}>RECENT CERTIFICATE</Text><View style={s.certRow}><View style={s.certIcon}><Text style={s.certEmoji}>{recentCertificate.icon}</Text></View><View style={s.certInfo}><Text style={s.certTitle}>{recentCertificate.title}</Text><Text style={s.muted}>{recentCertificate.issuer}</Text><Text style={s.smallMuted}>Issued: {recentCertificate.issued}</Text><Text style={s.verified}><Ionicons name="shield-checkmark" size={13} color={Brand.success} /> {recentCertificate.status}</Text></View></View><View style={s.actions}><TouchableOpacity style={s.outlineBtn} onPress={() => router.push('/(holder)/certificates')}><Ionicons name="eye-outline" size={16} color={Brand.navy} /><Text style={s.outlineText}>View</Text></TouchableOpacity><TouchableOpacity style={s.primaryBtn} onPress={() => router.push('/(holder)/share')}><Ionicons name="share-social-outline" size={16} color="white" /><Text style={s.primaryText}>Share</Text></TouchableOpacity></View></View>
     <View style={s.card}><View style={s.headingRow}><Text style={s.sectionLabel}>RECENT ACTIVITY</Text><TouchableOpacity onPress={() => router.push('/(holder)/activity')}><Text style={s.link}>View All</Text></TouchableOpacity></View>{HOLDER_ACTIVITY.slice(0, 3).map(item => <View key={item.text + item.detail} style={s.activityRow}><View style={[s.activityIcon, { backgroundColor: item.bg }]}><Ionicons name={item.icon} size={16} color={item.color} /></View><View style={{ flex: 1 }}><Text style={s.activityText}>{item.text}</Text><Text style={s.smallMuted}>{item.detail} · {item.date}</Text></View></View>)}</View>
   </ScrollView></SafeAreaView>
 }

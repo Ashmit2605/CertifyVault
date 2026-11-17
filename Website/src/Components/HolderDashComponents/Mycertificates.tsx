@@ -102,7 +102,7 @@ export default function MyCertificates() {
 
   return (
     <>
-      <main className="mx-auto max-w-[1440px] px-6 py-8 lg:px-10">
+      <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-[24px] font-semibold tracking-tight text-[#000F3E]">My Certificates</h1>

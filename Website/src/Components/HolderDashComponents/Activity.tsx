@@ -63,7 +63,7 @@ export default function Activity() {
   const [tab, setTab] = useState<Tab>("activity");
 
   return (
-    <main className="mx-auto max-w-[900px] px-6 py-8 lg:px-10">
+    <main className="mx-auto w-full max-w-[900px] px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
         <h1 className="mb-1 text-[24px] font-semibold tracking-tight text-[#000F3E]">
           Activity
         </h1>

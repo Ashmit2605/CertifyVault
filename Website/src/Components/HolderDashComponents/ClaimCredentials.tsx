@@ -62,7 +62,7 @@ export default function ClaimCredentials() {
   };
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-6 py-8 lg:px-10">
+    <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 xl:px-10 xl:py-8">
       <header><h1 className="text-2xl font-semibold text-[#000F3E]">Claim credentials</h1><p className="mt-1 text-sm text-[#6B7494]">Accept an institution invitation or request a search using your verified account email and institution reference.</p></header>
       {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
       {notice && <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}

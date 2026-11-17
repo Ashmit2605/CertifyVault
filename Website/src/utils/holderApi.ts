@@ -131,7 +131,7 @@ function parseCredential(value: unknown): HolderCredential {
 }
 
 export async function getHolderCredentials(token: string) {
-  const result = await data("/me/credentials", token);
+  const result = await data("/holder/credentials", token);
   if (!Array.isArray(result.credentials)) {
     throw new Error("The wallet returned an invalid credential list.");
   }
@@ -140,7 +140,7 @@ export async function getHolderCredentials(token: string) {
 
 export async function getHolderCredential(token: string, certificateId: string) {
   const result = await data(
-    `/me/credentials/${encodeURIComponent(certificateId)}`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}`,
     token,
   );
   if (!isRecord(result.credential)) {
@@ -150,7 +150,7 @@ export async function getHolderCredential(token: string, certificateId: string) 
 }
 
 export async function getHolderInvitations(token: string) {
-  const result = await data("/me/credential-invitations", token);
+  const result = await data("/holder/credential-invitations", token);
   if (!Array.isArray(result.invitations)) {
     throw new Error("The wallet returned an invalid invitation list.");
   }
@@ -158,7 +158,7 @@ export async function getHolderInvitations(token: string) {
 }
 
 export async function getHolderClaimRequests(token: string) {
-  const result = await data("/me/claim-requests", token);
+  const result = await data("/holder/claim-requests", token);
   if (!Array.isArray(result.claims)) {
     throw new Error("The wallet returned an invalid claim-request list.");
   }
@@ -171,7 +171,7 @@ export async function updateCredentialSharing(
   settings: CredentialSharingSettings,
 ) {
   return data(
-    `/me/credentials/${encodeURIComponent(certificateId)}/sharing`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}/sharing`,
     token,
     { method: "PATCH", body: JSON.stringify(settings) },
   );
@@ -184,7 +184,7 @@ export async function createCredentialShareLink(
   allowPdfDownload: boolean,
 ) {
   const result = await data(
-    `/me/credentials/${encodeURIComponent(certificateId)}/share-links`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}/share-links`,
     token,
     {
       method: "POST",
@@ -202,7 +202,7 @@ export async function getCredentialShareLinks(
   certificateId: string,
 ) {
   const result = await data(
-    `/me/credentials/${encodeURIComponent(certificateId)}/share-links`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}/share-links`,
     token,
   );
   if (!Array.isArray(result.links)) {
@@ -217,7 +217,7 @@ export async function revokeCredentialShareLink(
   linkId: number,
 ) {
   await request(
-    `/me/credentials/${encodeURIComponent(certificateId)}/share-links/${linkId}`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}/share-links/${linkId}`,
     token,
     { method: "DELETE" },
   );
@@ -228,7 +228,7 @@ export async function downloadHolderCredentialPdf(
   certificateId: string,
 ) {
   return (await request(
-    `/me/credentials/${encodeURIComponent(certificateId)}/pdf`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}/pdf`,
     token,
   )).blob();
 }
@@ -238,7 +238,7 @@ export async function exportHolderCredential(
   certificateId: string,
 ) {
   return (await request(
-    `/me/credentials/${encodeURIComponent(certificateId)}/export`,
+    `/holder/credentials/${encodeURIComponent(certificateId)}/export`,
     token,
   )).json();
 }
