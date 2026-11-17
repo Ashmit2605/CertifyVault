@@ -113,7 +113,7 @@ function parseAuthenticationOptions(
 }
 
 export async function listPasskeys(token: string): Promise<PasskeyRecord[]> {
-  const data = await request(token, "/me/passkeys");
+  const data = await request(token, "/holder/passkeys");
   if (!Array.isArray(data.authenticators)) {
     throw new Error("The passkey service returned an invalid authenticator list.");
   }
@@ -139,7 +139,7 @@ export async function listPasskeys(token: string): Promise<PasskeyRecord[]> {
 }
 
 export async function createPasskeyRegistrationOptions(token: string) {
-  const data = await request(token, "/me/passkeys/registration/options", {
+  const data = await request(token, "/holder/passkeys/registration/options", {
     method: "POST",
   });
   return parseRegistrationOptions(data.options);
@@ -150,14 +150,14 @@ export async function verifyPasskeyRegistration(
   response: RegistrationResponseJSON,
   deviceName: string,
 ) {
-  return request(token, "/me/passkeys/registration/verify", {
+  return request(token, "/holder/passkeys/registration/verify", {
     method: "POST",
     body: JSON.stringify({ response, deviceName }),
   });
 }
 
 export async function createPasskeyAuthenticationOptions(token: string) {
-  const data = await request(token, "/me/passkeys/authentication/options", {
+  const data = await request(token, "/holder/passkeys/authentication/options", {
     method: "POST",
   });
   return parseAuthenticationOptions(data.options);
@@ -167,12 +167,12 @@ export async function verifyPasskeyAuthentication(
   token: string,
   response: AuthenticationResponseJSON,
 ) {
-  return request(token, "/me/passkeys/authentication/verify", {
+  return request(token, "/holder/passkeys/authentication/verify", {
     method: "POST",
     body: JSON.stringify({ response }),
   });
 }
 
 export async function revokePasskey(token: string, id: number) {
-  await request(token, `/me/passkeys/${id}`, { method: "DELETE" });
+  await request(token, `/holder/passkeys/${id}`, { method: "DELETE" });
 }

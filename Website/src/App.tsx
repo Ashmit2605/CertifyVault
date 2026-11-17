@@ -1,7 +1,14 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import PageLoader from "./Components/layout/PageLoader";
 import RequireAuth from "./Components/auth/RequireAuth";
+import type { VerificationResult } from "./types/verifier";
+import {
+  MOCK_CHART_DATA,
+  MOCK_HISTORY,
+  MOCK_STATS,
+  MOCK_VERIFIED_RESULT,
+} from "./data/verifierMockData";
 
 const Layout = lazy(() => import("./Components/layout/Layout"));
 const Home = lazy(() => import("./Pages/Home"));
@@ -27,11 +34,14 @@ const Privacy = lazy(() => import("./Pages/Privacy"));
 
 // Verifier dashboard
 const VerifierDashLayout = lazy(() => import("./Pages/VerifierDashLayout/VerifierDashLayout"));
-const VerifierDashboard = lazy(() => import("./Pages/VerifierDashLayout/VerifierDashboard"));
-const VerificationHistory = lazy(() => import("./Pages/VerifierDashLayout/VerificationHistory"));
-const SavedVerifications = lazy(() => import("./Pages/VerifierDashLayout/SavedVerifications"));
-const VerificationReports = lazy(() => import("./Pages/VerifierDashLayout/VerificationReports"));
-const VerifierProfile = lazy(() => import("./Pages/VerifierDashLayout/VerifierProfile"));
+const VerifierStatsBar = lazy(() => import("./Components/VerifierDashComponents/StatsBar"));
+const VerifierActivityChart = lazy(() => import("./Components/VerifierDashComponents/ActivityChart"));
+const VerifierRecentVerifications = lazy(() => import("./Components/VerifierDashComponents/RecentVerifications"));
+const VerifierInput = lazy(() => import("./Components/VerifierDashComponents/VerificationInput"));
+const VerifierResult = lazy(() => import("./Components/VerifierDashComponents/VerificationResult"));
+const VerifierReportsPage = lazy(() => import("./Components/VerifierDashComponents/VerifierReportsPage"));
+const VerifierSavedPage = lazy(() => import("./Components/VerifierDashComponents/VerifierSavedPage"));
+const VerifierProfilePage = lazy(() => import("./Components/VerifierDashComponents/VerifierProfilePage"));
 
 // Issuer dashboard
 const IssuerDashLayout = lazy(() => import("./Pages/IssuerDashLayout/IssuerDashLayout"));
@@ -137,6 +147,17 @@ function ComingSoon({ label }: { label: string }) {
 }
 
 export default function App() {
+  const [verifierLoading, setVerifierLoading] = useState(false);
+  const [verifierResult, setVerifierResult] = useState<VerificationResult | null>(null);
+
+  const handleVerifierCheck = () => {
+    setVerifierLoading(true);
+    window.setTimeout(() => {
+      setVerifierResult({ ...MOCK_VERIFIED_RESULT, verifiedAt: new Date().toISOString() });
+      setVerifierLoading(false);
+    }, 900);
+  };
+
   return (
     <Suspense fallback={<PageLoader />}>
     <Routes>
@@ -170,12 +191,36 @@ export default function App() {
 
       {/* ── Verifier Dashboard ── */}
       <Route path="/verifierdashboard" element={<RequireAuth role="verifier"><VerifierDashLayout /></RequireAuth>}>
-        <Route index element={<VerifierDashboard />} />
-        <Route path="verify" element={<Verify />} />
-        <Route path="history" element={<VerificationHistory />} />
-        <Route path="saved" element={<SavedVerifications />} />
-        <Route path="reports" element={<VerificationReports />} />
-        <Route path="profile" element={<VerifierProfile />} />
+        <Route index element={
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-extrabold text-navy">Verifier Dashboard</h1>
+              <p className="mt-1 text-sm text-[#6B7BA6]">Review your certificate verification activity.</p>
+            </div>
+            <VerifierStatsBar stats={MOCK_STATS} />
+            <div className="grid gap-6 xl:grid-cols-2">
+              <VerifierActivityChart data={MOCK_CHART_DATA} />
+              <VerifierRecentVerifications items={MOCK_HISTORY} limit={4} />
+            </div>
+          </div>
+        } />
+        <Route path="verify" element={
+          verifierResult
+            ? <VerifierResult result={verifierResult} onReset={() => setVerifierResult(null)} />
+            : <div className="mx-auto max-w-3xl rounded-3xl border border-[#E2E6F0] bg-white p-5 sm:p-7">
+                <h1 className="mb-5 text-2xl font-extrabold text-navy">Verify a certificate</h1>
+                <VerifierInput onVerify={handleVerifierCheck} loading={verifierLoading} />
+              </div>
+        } />
+        <Route path="history" element={
+          <div>
+            <h1 className="mb-6 text-2xl font-extrabold text-navy">Verification history</h1>
+            <VerifierRecentVerifications items={MOCK_HISTORY} />
+          </div>
+        } />
+        <Route path="saved" element={<VerifierSavedPage />} />
+        <Route path="reports" element={<VerifierReportsPage />} />
+        <Route path="settings" element={<VerifierProfilePage />} />
       </Route>
 
       {/* ── Holder Dashboard ── */}

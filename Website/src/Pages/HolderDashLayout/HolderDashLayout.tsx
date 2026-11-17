@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import {
-  ShieldCheck,
   Home,
   FileBadge,
   BadgeCheck,
@@ -11,12 +10,9 @@ import {
   Activity,
   UserRound,
   KeyRound,
-  Bell,
-  Search,
   Menu,
   X,
   LogOut,
-  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import logo from "../../assets/Logo.webp";
@@ -34,161 +30,57 @@ const navItems: NavItem[] = [
   { title: "Verification", path: "/holderdashboard/verification", icon: ScanSearch },
   { title: "Share", path: "/holderdashboard/share", icon: Share2 },
   { title: "Activity", path: "/holderdashboard/activity", icon: Activity },
-  { title: "Profile", path: "/holderdashboard/profile", icon: UserRound },
   { title: "Security", path: "/holderdashboard/security", icon: KeyRound },
+  { title: "Profile", path: "/holderdashboard/profile", icon: UserRound },
 ];
+
+// Shared tokens (same as the issuer dashboard)
+const PAGE_BG = "bg-[#F7F8FC]";
+const SOFT_BG = "bg-[#F0F2F8]";
+const SOFT_HOVER = "hover:bg-[#F0F2F8]";
 
 export function TopNav() {
   const { signOut } = useClerk();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
 
   const handleLogout = (): void => {
-    setShowProfileMenu(false);
+    setIsMobileMenuOpen(false);
     setShowLogoutModal(true);
   };
   const confirmLogout = (): void => {
     setShowLogoutModal(false);
-    void signOut({ redirectUrl: "/app/login" });
+    void signOut().then(() => navigate("/app/login", { replace: true }));
   };
   const cancelLogout = (): void => setShowLogoutModal(false);
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 lg:px-6">
-          {/* ── LOGO ── */}
+      <header className="sticky top-0 z-40 w-full border-b border-[#E2E6F0] bg-white font-figtree">
+        <div className="flex min-h-[72px] w-full items-center gap-5 px-4 py-3 xl:min-h-[80px] xl:px-6 xl:py-[18px]">
+          {/* Logo — left corner */}
           <div className="flex shrink-0 items-center gap-2">
             <img
               src={logo}
               alt="CertifyVault Logo"
               className="h-8 w-auto object-contain"
             />
-            <span className="hidden text-lg font-bold text-gray-900 sm:inline">
-              CertifyVault
-            </span>
-          </div>
-
-          {/* ── DESKTOP HORIZONTAL NAV ── */}
-          <nav className="hidden flex-1 items-center justify-center gap-1 lg:flex">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === "/holderdashboard"}
-                  className={({ isActive }) =>
-                    `group relative flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
-                      isActive
-                        ? "text-blue-600"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        size={17}
-                        className={`shrink-0 transition-transform duration-150 group-hover:scale-110 ${
-                          isActive ? "text-blue-600" : "text-gray-500"
-                        }`}
-                      />
-                      <span className="whitespace-nowrap">{item.title}</span>
-                      <span
-                        className={`absolute -bottom-[17px] left-1/2 h-0.5 w-full -translate-x-1/2 rounded-full bg-blue-600 transition-all duration-200 ${
-                          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-40"
-                        }`}
-                      />
-                    </>
-                  )}
-                </NavLink>
-              );
-            })}
-          </nav>
-
-          {/* ── RIGHT ACTIONS ── */}
-          <div className="flex shrink-0 items-center gap-2 lg:gap-3">
-            <button className="hidden cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 md:flex">
-              <Search size={16} />
-              <span className="hidden xl:inline">Search certificates...</span>
-            </button>
-
-            <button
-              className="relative cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-              aria-label="Notifications"
-            >
-              <Bell size={20} />
-              <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-red-500" />
-            </button>
-
-            {/* ── PROFILE DROPDOWN ── */}
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu((p) => !p)}
-                className="flex cursor-pointer items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition-colors hover:bg-gray-50"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600">
-                  <ShieldCheck size={16} />
-                </span>
-                <span className="hidden text-left sm:block">
-                  <span className="block text-sm font-medium leading-tight text-gray-900">
-                    Certificate Holder
-                  </span>
-                  <span className="block text-xs leading-tight text-gray-500">
-                    Student
-                  </span>
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`hidden text-gray-400 transition-transform duration-150 sm:block ${
-                    showProfileMenu ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {showProfileMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowProfileMenu(false)}
-                  />
-                  <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                    <NavLink
-                      to="/holderdashboard/profile"
-                      onClick={() => setShowProfileMenu(false)}
-                      className="flex cursor-pointer items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <UserRound size={16} />
-                      My Profile
-                    </NavLink>
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut size={16} />
-                      Logout
-                    </button>
-                  </div>
-                </>
-              )}
+            <div className="leading-tight">
+              <div className="whitespace-nowrap text-[17px] font-extrabold text-navy">
+                Certify<span className="text-brand">Vault</span>
+              </div>
+              <div className="mt-0.5 hidden whitespace-nowrap text-[11px] font-semibold text-[#6B7BA6] xl:block">
+                Holder Dashboard
+              </div>
             </div>
-
-            {/* ── MOBILE MENU TOGGLE ── */}
-            <button
-              onClick={() => setIsMobileMenuOpen((p) => !p)}
-              className="cursor-pointer rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
-              aria-label="Toggle menu"
-            >
-              {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
           </div>
-        </div>
 
-        {/* ── MOBILE DROPDOWN NAV ── */}
-        {isMobileMenuOpen && (
-          <nav className="border-t border-gray-200 bg-white px-4 py-2 lg:hidden">
+          {/* Desktop nav — centered between logo and logout */}
+          <nav
+            aria-label="Holder navigation"
+            className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex"
+          >
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -196,64 +88,144 @@ export function TopNav() {
                   key={item.path}
                   to={item.path}
                   end={item.path === "/holderdashboard"}
-                  onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-gray-600 hover:bg-gray-50"
+                    `flex items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 py-2.5 text-[13px] transition-colors ${isActive
+                      ? `${SOFT_BG} font-bold text-brand`
+                      : `font-semibold text-[#6B7BA6] ${SOFT_HOVER} hover:text-navy`
                     }`
                   }
                 >
-                  <Icon size={18} />
+                  <Icon size={16} strokeWidth={1.9} />
                   {item.title}
                 </NavLink>
               );
             })}
-            <button
-              onClick={handleLogout}
-              className="mt-1 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-            >
-              <LogOut size={18} />
-              Logout
-            </button>
           </nav>
-        )}
+
+          {/* Desktop logout — right corner */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="Log out"
+            className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-[10px] border border-[#E2E6F0] bg-white px-2.5 py-2 text-[13px] font-semibold text-rose-500 transition-colors hover:bg-rose-50 sm:px-3 sm:py-[9px]"
+          >
+            <LogOut size={16} strokeWidth={1.8} />
+            <span className="hidden sm:inline">Log out</span>
+          </button>
+
+          {/* Mobile / tablet hamburger */}
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Open navigation"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#E2E6F0] bg-white text-navy transition-colors hover:bg-[#F0F2F8] xl:hidden"
+          >
+            <Menu size={20} />
+          </button>
+        </div>
       </header>
+
+      {/* ── MOBILE OVERLAY ── */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-[#000F3E]/40 backdrop-blur-sm xl:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* ── MOBILE DRAWER ── */}
+      <div
+        className={`
+          fixed inset-y-0 right-0 z-50 flex w-[85vw] max-w-[340px] flex-col
+          border-l border-[#E2E6F0] bg-white font-figtree shadow-xl xl:hidden
+          transform transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}
+        `}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-[#E2E6F0] px-5 py-4">
+          <div className="flex items-center gap-2">
+            <img
+              src={logo}
+              alt="CertifyVault Logo"
+              className="h-7 w-auto object-contain"
+            />
+            <span className="font-extrabold text-navy">
+              Certify<span className="text-brand">Vault</span>
+            </span>
+          </div>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors hover:bg-[#F0F2F8]"
+            aria-label="Close navigation"
+          >
+            <X size={20} className="text-navy" />
+          </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === "/holderdashboard"}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `mb-1 flex items-center gap-3 rounded-xl px-4 py-3 text-[14.5px] transition-colors ${isActive
+                    ? `${SOFT_BG} font-bold text-brand`
+                    : `font-semibold text-navy ${SOFT_HOVER}`
+                  }`
+                }
+              >
+                <Icon size={18} strokeWidth={1.8} />
+                {item.title}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        <div className="shrink-0 border-t border-[#E2E6F0] p-3">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[14.5px] font-bold text-rose-500 transition-colors hover:bg-rose-50"
+          >
+            <LogOut size={18} strokeWidth={1.8} />
+            <span>Log out</span>
+          </button>
+        </div>
+      </div>
 
       {/* ── LOGOUT CONFIRM MODAL ── */}
       {showLogoutModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Confirm Logout
-              </h3>
+        <div
+          onClick={cancelLogout}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#000F3E]/45 p-5 font-figtree backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-[18px] bg-white p-6 shadow-xl"
+          >
+            <h3 className="mb-1.5 text-lg font-extrabold text-navy">
+              Log out of CertifyVault?
+            </h3>
+            <p className="mb-5 text-[13.5px] font-medium leading-relaxed text-[#6B7BA6]">
+              You'll need to sign back in to access your certificates again.
+            </p>
+            <div className="flex gap-2.5">
               <button
                 onClick={cancelLogout}
-                className="cursor-pointer text-gray-400 transition-colors hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              <p className="text-gray-600">
-                Are you sure you want to logout? You'll need to sign in again
-                to access your certificates.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-3 border-t border-gray-200 p-6">
-              <button
-                onClick={cancelLogout}
-                className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="flex-1 rounded-xl border border-[#E2E6F0] bg-white px-4 py-[11px] text-sm font-bold text-navy transition-colors hover:bg-[#F0F2F8]"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmLogout}
-                className="cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                className="flex-1 rounded-xl bg-rose-500 px-4 py-[11px] text-sm font-bold text-white shadow-lg shadow-rose-500/30 transition-colors hover:bg-rose-600"
               >
-                Logout
+                Log out
               </button>
             </div>
           </div>
@@ -277,17 +249,17 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex items-start justify-between border-b border-gray-200 bg-white px-6 py-4">
+    <div className="flex items-start justify-between gap-4 rounded-t-2xl border-b border-[#E2E6F0] bg-white px-6 py-4">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+        <h1 className="text-xl font-semibold text-navy">{title}</h1>
         {description && (
-          <p className="mt-1 text-sm text-gray-600">{description}</p>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
         )}
       </div>
       {action && (
         <button
           onClick={action.onClick}
-          className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50"
+          className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-white transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:pointer-events-none disabled:opacity-50"
         >
           {action.icon}
           {action.label}
@@ -299,11 +271,11 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
 
 export function HolderDashboardLayout() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div
+      className={`flex min-h-screen flex-col ${PAGE_BG} font-figtree text-navy`}
+    >
       <TopNav />
-      <main className="min-h-screen">
-        <Outlet />
-      </main>
+      <Outlet />
     </div>
   );
 }

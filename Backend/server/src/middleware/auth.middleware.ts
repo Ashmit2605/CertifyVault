@@ -70,6 +70,17 @@ export async function authMiddleware(
     res.locals.clerkUserId = claims.sub;
     next();
   } catch (error) {
+    const sessionExpired =
+      error instanceof Error && /jwt is expired/i.test(error.message);
+
+    if (sessionExpired) {
+      res.status(401).json({
+        success: false,
+        message: "Your session has expired. Please refresh the page or sign in again.",
+      });
+      return;
+    }
+
     console.error(
       "Clerk session verification failed:",
       error instanceof Error
