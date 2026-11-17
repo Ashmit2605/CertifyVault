@@ -124,6 +124,8 @@ npm start
 
 ## Database / Drizzle
 
+Run these commands from `Backend/server`, where the backend `.env` and `package.json` are located. `db:generate` creates a SQL migration but does not apply it; `db:migrate` applies pending migrations to the PostgreSQL database selected by `DATABASE_URL`.
+
 Generate a migration from schema changes:
 
 ```bash
